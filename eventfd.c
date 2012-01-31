@@ -1,0 +1,66 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  eventfd.c
+ *
+ *    Description:  
+ *
+ *        Version:  1.0
+ *        Created:  01/31/2012 05:20:50 PM
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Yin Zhongxing (olym), zhongxing.yin@cs2c.com.cn
+ *        Company:  www.CS2C.com.cn
+ *
+ * =====================================================================================
+ */
+
+int create_timerfd()
+{
+    int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
+
+    if (timerfd < 0) {
+        fprintf(stderr, "failed in timerfd_create\n");
+        return -1;
+    }
+
+    return timerfd;
+}
+
+void set_timerfd(int timerfd, const struct timeval *tv)
+{
+  // wake up loop by timerfd_settime()
+  struct itimerspec newValue;
+  struct itimerspec oldValue;
+  bzero(&newValue, sizeof newValue);
+  bzero(&oldValue, sizeof oldValue);
+  newValue.it_value.tv_sec = tv->tv_sec;
+  newValue.it_value.tv_nsec = tv->tv_usec/1000;
+  int ret = timerfd_settime(timerfd, 0, &newValue, &oldValue);
+  if (ret) {
+      fprintf(stderr, "%s: timerfd_settime()", __func__);
+  }
+}
+
+int signalfd_creat(int signo)
+{
+    sigset_t mask;
+    int sfd;
+
+    sigemptyset(&mask);
+    sigaddset(&mask, signo);
+
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
+        fprintf(stderr, "%s: sigprocmask\n", __func__);
+        return -1;
+    }
+
+    sfd = signalfd(-1, &mask, SFD_CLOEXEC | SFD_NONBLOCK);
+    if (sfd == -1) {
+        fprintf(stderr, "%s: signalfd\n", __func__);
+        return -1;
+    }
+
+    return sfd;
+}
