@@ -22,12 +22,6 @@
 #define EVLIST_INSERTED	0x01
 #define EVLIST_ACTIVE	0x02
 
-/** @file event_struct.h
-
-  Structures used by event.h.  Using these structures directly may harm
-  forward compatibility: be careful!
-
- */
 
 #ifdef __cplusplus
 extern "C" {

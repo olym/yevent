@@ -90,18 +90,6 @@ int event_base_set(struct event_base *, struct event *);
   */
 int event_base_loop(struct event_base *, int);
 
-/* Flags to pass to event_set(), event_new(), event_assign(),
- * event_pending(), and anything else with an argument of the form
- * "short events" */
-#define EV_TIMEOUT	0x01
-#define EV_READ		0x02
-#define EV_WRITE	0x04
-#define EV_SIGNAL	0x08
-/** Persistent event: won't get removed automatically when activated. */
-#define EV_PERSIST	0x10
-/** Select edge-triggered behavior, if supported by the backend. */
-#define EV_ET       0x20
-
 typedef void (*event_callback_fn)(evutil_socket_t, short, void *);
 
 /**
