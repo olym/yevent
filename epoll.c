@@ -35,7 +35,7 @@ struct epollop {
     int epfd;
 };
 
-static void *
+void *
 epoll_init()
 {
     int epfd;
@@ -61,7 +61,7 @@ epoll_init()
     return epollop;
 }
 
-static int
+int
 epoll_add(struct event_base* event_base, int fd, int mask)
 {
     struct epollop *epollop = event_base->evdata; 
@@ -79,7 +79,7 @@ epoll_add(struct event_base* event_base, int fd, int mask)
     return 0;
 }
 
-static int
+int
 epoll_del(struct event_base *event_base, int fd)
 {
     struct epollop *epollop = event_base->evdata;
@@ -97,7 +97,8 @@ epoll_del(struct event_base *event_base, int fd)
     }
     return 0;
 }
-static int
+
+int
 epoll_update(struct event_base *event_base, int fd, int mask)
 {
     struct epollop *epollop = event_base->evdata;
@@ -119,7 +120,7 @@ epoll_update(struct event_base *event_base, int fd, int mask)
     return 0;
 }
 
-static void
+void
 epoll_free(struct event_base *event_base)
 {
     struct epollop *epollop = event_base->evdata;
@@ -127,7 +128,7 @@ epoll_free(struct event_base *event_base)
     free(epollop);
 }
 
-static int
+int
 epoll_dispatch(struct event_base *event_base, struct timeval *tv)
 {
     struct epollop *epollop = event_base->evdata;

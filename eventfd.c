@@ -15,6 +15,14 @@
  *
  * =====================================================================================
  */
+#include <sys/timerfd.h>
+#include <sys/signalfd.h>
+#include <signal.h>
+#include <time.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <stdio.h>
 
 int create_timerfd()
 {

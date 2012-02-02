@@ -16,7 +16,44 @@
  * =====================================================================================
  */
 
-#define ev_io_next	_ev.ev_io.ev_io_next
+#ifndef _EVENT_INTERNAL_H_
+#define _EVENT_INTERNAL_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include <stdint.h>
+#include <sys/queue.h>
+#define ev_io_next	ev_io.ev_io_next
+#define evutil_socket_t int
+
+struct event {
+	TAILQ_ENTRY(event) ev_active_next;
+	TAILQ_ENTRY(event) ev_next;
+	
+	evutil_socket_t ev_fd;
+
+	struct event_base *ev_base;
+
+    /* used for io events */
+    struct {
+        //TAILQ_ENTRY(event) ev_io_next;
+        struct timeval ev_timeout;
+    } ev_io;
+
+	short ev_events;
+	short ev_res;		/* result passed to event callback */
+	short ev_flags;
+	uint8_t ev_pri;	/* smaller numbers are higher priority */
+	uint8_t ev_closure;
+	struct timeval ev_timeout;
+
+	/* allows us to adopt for different types of events */
+	void (*ev_callback)(evutil_socket_t, short, void *arg);
+	void *ev_arg;
+};
+
+TAILQ_HEAD (event_list, event);
 
 /* Flags to pass to event_set(), event_new(), event_assign(),
  * event_pending(), and anything else with an argument of the form
@@ -70,3 +107,9 @@ struct event_base {
 
 #define N_ACTIVE_CALLBACKS(base)					\
 	((base)->event_count_active + (base)->defer_queue.active_count)
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

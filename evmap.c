@@ -21,18 +21,20 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 
 #include "event-internal.h"
+#include "epoll.h"
 /** An entry for an evmap_io list: notes all the events that want to read or
 	write on a given fd, and the number of each.
   */
 struct evmap_io {
 	struct event_list events;
-	ev_uint16_t nread;
-	ev_uint16_t nwrite;
+	uint16_t nread;
+	uint16_t nwrite;
 };
 
-#define GET_SIGNAL_SLOT(x, map, slot, type)			\
+#define GET_IO_SLOT(x, map, slot, type)			\
 	(x) = (struct type *)((map)->entries[slot])
 #define GET_IO_SLOT_AND_CTOR(x, map, slot, type, ctor)	\
 	do {								\
@@ -84,7 +86,7 @@ int evmap_io_add(struct event_base *base, int fd, struct event *ev)
     struct event_io_map *map = &base->iomap;
     struct evmap_io *ctx = NULL;
 	int nread, nwrite, retval = 0;
-	short res = 0, old = 0;
+	short res = 0;
 	struct event *old_ev;
 
 	if (fd < 0)
@@ -100,11 +102,6 @@ int evmap_io_add(struct event_base *base, int fd, struct event *ev)
 	nread = ctx->nread;
 	nwrite = ctx->nwrite;
 
-	if (nread)
-		old |= EV_READ;
-	if (nwrite)
-		old |= EV_WRITE;
-
 	if (ev->ev_events & EV_READ) {
 		if (++nread == 1)
 			res |= EV_READ;
@@ -114,7 +111,7 @@ int evmap_io_add(struct event_base *base, int fd, struct event *ev)
 			res |= EV_WRITE;
 	}
     if (res) {
-        if (epoll_add(base, ev->ev_fd, old, ev->events) == -1)
+        if (epoll_add(base, ev->ev_fd, ev->ev_events) == -1)
             return -1;
         retval = 1;
     }
@@ -131,7 +128,7 @@ int evmap_io_del(struct event_base *base, int fd, struct event *ev)
 	struct event_io_map *io = &base->iomap;
 	struct evmap_io *ctx;
 	int nread, nwrite, retval = 0;
-	short res = 0, old = 0;
+    int res = 0;
 
 	if (fd < 0)
 		return 0;
@@ -143,11 +140,6 @@ int evmap_io_del(struct event_base *base, int fd, struct event *ev)
 
 	nread = ctx->nread;
 	nwrite = ctx->nwrite;
-
-	if (nread)
-		old |= EV_READ;
-	if (nwrite)
-		old |= EV_WRITE;
 
 	if (ev->ev_events & EV_READ) {
 		if (--nread == 0)
@@ -161,7 +153,7 @@ int evmap_io_del(struct event_base *base, int fd, struct event *ev)
 	}
 
 	if (res) {
-		if (epoll_del(base, ev->ev_fd, old, res) == -1)
+		if (epoll_del(base, ev->ev_fd) == -1)
 			return (-1);
 		retval = 1;
 	}
