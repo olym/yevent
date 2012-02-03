@@ -24,8 +24,10 @@ extern "C" {
 #endif
 #include <stdint.h>
 #include <sys/queue.h>
-#define ev_io_next	ev_io.ev_io_next
+
 #define evutil_socket_t int
+
+#define EVENT_MAX_PRIORITIES 256
 
 struct event {
 	TAILQ_ENTRY(event) ev_active_next;
@@ -37,7 +39,7 @@ struct event {
 
     /* used for io events */
     struct {
-        //TAILQ_ENTRY(event) ev_io_next;
+        TAILQ_ENTRY(event) ev_io_next;
         struct timeval ev_timeout;
     } ev_io;
 
@@ -66,6 +68,14 @@ TAILQ_HEAD (event_list, event);
 #define EV_PERSIST	0x10
 /** Select edge-triggered behavior, if supported by the backend. */
 #define EV_ET       0x20
+
+#define EVLIST_INSERTED	0x01
+#define EVLIST_ACTIVE   0x02
+#define EVLIST_INIT	0x80
+
+/* Possible values for ev_closure in struct event. */
+#define EV_CLOSURE_NONE 0
+#define EV_CLOSURE_PERSIST 1
 
 struct event_io_map {
     /* An array of evmap_io; empty entries are set to NULL.
@@ -106,7 +116,7 @@ struct event_base {
 };
 
 #define N_ACTIVE_CALLBACKS(base)					\
-	((base)->event_count_active + (base)->defer_queue.active_count)
+	((base)->event_count_active)
 
 #ifdef __cplusplus
 }

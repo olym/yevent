@@ -25,6 +25,9 @@
 
 #include "event-internal.h"
 #include "epoll.h"
+
+#define ev_io_next	ev_io.ev_io_next
+
 /** An entry for an evmap_io list: notes all the events that want to read or
 	write on a given fd, and the number of each.
   */

@@ -23,9 +23,17 @@
 #include <stdio.h>
 
 #include "event.h"
-#include "event_struct.h"
 #include "event-internal.h"
-TAILQ_HEAD (event_list, event);
+#include "epoll.h"
+
+/* Prototypes */
+static inline int event_add_internal(struct event *ev,
+    const struct timeval *tv, int tv_is_absolute);
+static inline int event_del_internal(struct event *ev);
+
+static void	event_queue_insert(struct event_base *, struct event *, int);
+static void	event_queue_remove(struct event_base *, struct event *, int);
+static int	event_process_active(struct event_base *);
 
 struct event_base *
 event_base_new()
@@ -39,12 +47,12 @@ event_base_new()
 
     TAILQ_INIT(&base->eventqueue);
 
-    evmap_io_initmap(&base->io);
+    evmap_io_initmap(&base->iomap);
 
-    base->evbase = NULL;
+    base->evdata = NULL;
 
-    base->evbase = epoll_init();
-    if (base->evbase == NULL) {
+    base->evdata = epoll_init();
+    if (base->evdata == NULL) {
         fprintf(stderr, "%s: no epoll_init error\n", __func__);
         event_base_free(base);
         return NULL;
@@ -70,7 +78,7 @@ event_init(void)
 {
     struct event_base *base = event_base_new();
     if (base == NULL) {
-        fprintf("%s: Unable to construct event_base\n", __func__);
+        fprintf(stderr, "%s: Unable to construct event_base\n", __func__);
         return NULL;
     }
 
@@ -82,8 +90,7 @@ event_base_priority_init(struct event_base *base, int npriorities)
 {
 	int i;
 
-	if (N_ACTIVE_CALLBACKS(base) || npriorities < 1
-	    || npriorities >= EVENT_MAX_PRIORITIES)
+	if (N_ACTIVE_CALLBACKS(base) || npriorities < 1 || npriorities > EVENT_MAX_PRIORITIES)
 		return (-1);
 
 	if (npriorities == base->nactivequeues)
@@ -180,8 +187,10 @@ event_process_active(struct event_base *base)
 }
 
 int
-event_base_dispatch(struct event_base *event_base)
+event_base_dispatch(struct event_base *base)
 {
+    int retval = 0;
+    int res;
 
 	if (base->running_loop) {
 		fprintf(stderr, "%s: reentrant invocation.  Only one event_base_loop"
@@ -192,9 +201,9 @@ event_base_dispatch(struct event_base *event_base)
 
 	base->running_loop = 1;
 
-    done = 0;
+    int done = 0;
 
-    base->th_owner_id = EVTHREAD_GET_ID();
+    //base->th_owner_id = EVTHREAD_GET_ID();
 
     base->event_break = 0;
 
@@ -259,15 +268,6 @@ event_assign(struct event *ev, struct event_base *base, evutil_socket_t fd, shor
     return 0;
 }
 
-void
-event_set(struct event *ev, evutil_socket_t fd, short events,
-	  void (*callback)(evutil_socket_t, short, void *), void *arg)
-{
-	int r;
-	r = event_assign(ev, current_base, fd, events, callback, arg);
-	assert(r == 0);
-}
-
 struct event *
 event_new(struct event_base *base, evutil_socket_t fd, short events, void (*cb)(evutil_socket_t, short, void *), void *arg)
 {
@@ -308,6 +308,23 @@ event_priority_set(struct event *ev, int pri)
 
 	return (0);
 }
+/* Implementation function to add an event.  Works just like event_add,
+ * except: 1) it requires that we have the lock.  2) if tv_is_absolute is set,
+ * we treat tv as an absolute time, not as an interval to add to the current
+ * time */
+static inline int
+event_add_internal(struct event *ev, const struct timeval *tv,
+    int tv_is_absolute)
+{
+    struct event_base *base = ev->ev_base;
+    int res = 0;
+
+    if (!(ev->ev_flags & (EVLIST_INSERTED|EVLIST_ACTIVE))) {
+        res = evmap_io_add(base, ev->ev_fd, ev);
+        if (res != -1)
+            event_queue_insert(base, ev, EVLIST_INSERTED);
+    }
+}
 
 int
 event_add(struct event *ev, const struct timeval *tv)
@@ -328,48 +345,12 @@ event_add(struct event *ev, const struct timeval *tv)
 	return (res);
 }
 
-/* Implementation function to add an event.  Works just like event_add,
- * except: 1) it requires that we have the lock.  2) if tv_is_absolute is set,
- * we treat tv as an absolute time, not as an interval to add to the current
- * time */
-static inline int
-event_add_internal(struct event *ev, const struct timeval *tv,
-    int tv_is_absolute)
-{
-    struct event_base *base = ev->ev_base;
-    int res = 0;
-
-    if (!(ev->ev_flags & (EVLIST_INSERTED|EVLIST_ACTIVE))) {
-        res = evmap_io_add(base, ev->ev_fd, ev);
-        if (res != -1)
-            event_queue_insert(base, ev, EVLIST_INSERTED);
-    }
-}
-
-int
-event_del(struct event *ev)
-{
-	int res;
-
-	if (EVUTIL_FAILURE_CHECK(!ev->ev_base)) {
-		event_warnx("%s: event has no event_base set.", __func__);
-		return -1;
-	}
-
-	EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
-
-	res = event_del_internal(ev);
-
-	EVBASE_RELEASE_LOCK(ev->ev_base, th_base_lock);
-
-	return (res);
-}
-
 /* Helper for event_del: always called with th_base_lock held. */
 static inline int
 event_del_internal(struct event *ev)
 {
     struct event_base *base;
+    int res = 0;
 
     if (ev->ev_base == NULL)
         return -1;
@@ -385,6 +366,25 @@ event_del_internal(struct event *ev)
     return res;
 }
 
+int
+event_del(struct event *ev)
+{
+	int res;
+
+	if (EVUTIL_FAILURE_CHECK(!ev->ev_base)) {
+		event_warnx("%s: event has no event_base set.", __func__);
+		return -1;
+	}
+
+	//EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
+
+	res = event_del_internal(ev);
+
+	//EVBASE_RELEASE_LOCK(ev->ev_base, th_base_lock);
+
+	return (res);
+}
+
 void
 event_active(struct event *ev, int res)
 {
@@ -393,13 +393,11 @@ event_active(struct event *ev, int res)
 		return;
 	}
 
-	EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
-
-	_event_debug_assert_is_setup(ev);
+	//EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
 
 	event_active_nolock(ev, res);
 
-	EVBASE_RELEASE_LOCK(ev->ev_base, th_base_lock);
+	//EVBASE_RELEASE_LOCK(ev->ev_base, th_base_lock);
 }
 
 void
@@ -425,12 +423,12 @@ event_queue_remove(struct event_base *base, struct event *ev, int queue)
 
     ev->ev_flags &= ~queue;
     switch (queue) {
-    case EVLIST_INSERTED:
+    case EVLIST_INSERTED :
         TAILQ_REMOVE(&base->eventqueue, ev, ev_next);
         break;
-    case EVLIST_ACITVE:
+    case EVLIST_ACTIVE :
         base->event_count_active--;
-        TAILQ_REMOVE(&base->activequeue[ev->ev_pri], ev, ev_active_next);
+        TAILQ_REMOVE(&base->activequeues[ev->ev_pri], ev, ev_active_next);
         break;
     default:
         fprint(stderr, "%s: unknown queue %x", __func__, queue);

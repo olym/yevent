@@ -28,9 +28,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-struct event_base;
-struct event;
+#include "event-internal.h"
 
 /**
   Initialize the event API.
@@ -185,6 +183,8 @@ int event_del(struct event *);
   @param ncalls
  **/
 void event_active(struct event *, int);
+
+void event_active_nolock(struct event *ev, int res);
 
 /**
    Get the socket assigned to an event.
