@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 #include "event-internal.h"
 #include "epoll.h"
@@ -50,6 +51,13 @@ struct evmap_io {
 		}							\
 		(x) = (struct type *)((map)->entries[slot]);		\
 	} while (0)
+
+void
+evmap_io_initmap(struct event_io_map *ctx)
+{
+	ctx->nentries = 0;
+	ctx->entries = NULL;
+}
 
 /** Expand 'map' with new entries of width 'msize' until it is big enough
 	to store a value in 'slot'.
@@ -114,7 +122,7 @@ int evmap_io_add(struct event_base *base, int fd, struct event *ev)
 			res |= EV_WRITE;
 	}
     if (res) {
-        if (epoll_add(base, ev->ev_fd, ev->ev_events) == -1)
+        if (epoll_add(base, ev->ev_fd, ev->ev_events | EV_ET) == -1)
             return -1;
         retval = 1;
     }
@@ -178,8 +186,9 @@ int evmap_io_active(struct event_base *base, int fd, short events)
 
 	assert(ctx);
 	TAILQ_FOREACH(ev, &ctx->events, ev_io_next) {
-		if (ev->ev_events & events)
-			event_active_nolock(ev, ev->ev_events & events, 1);
+		if (ev->ev_events & events){
+			event_active_nolock(ev, ev->ev_events & events);
+        }
 	}
 
 }

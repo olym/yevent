@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "event-internal.h"
 #define INITIAL_NEVENT 32
 #define MAX_NEVENT 4096
 
@@ -129,16 +130,32 @@ epoll_free(struct event_base *event_base)
 }
 
 int
-epoll_dispatch(struct event_base *event_base, struct timeval *tv)
+epoll_dispatch(struct event_base *base, struct timeval *tv)
 {
-    struct epollop *epollop = event_base->evdata;
+    struct epollop *epollop = base->evdata;
+	struct epoll_event *events = epollop->events;
     int res;
 
-    res = epoll_wait(epollop->epfd, epollop->events, epollop->nevents, 
+    res = epoll_wait(epollop->epfd, events, epollop->nevents, 
             tv ? (tv->tv_sec*1000 + tv->tv_usec/1000) : -1);
     int i;
     for (i = 0; i < res; i++) {
-        event_base->activefd[i] = epollop->events[i].data.fd;
+        //event_base->activefd[i] = epollop->events[i].data.fd;
+        int what = events[i].events;
+        short ev = 0;
+        if (what & (EPOLLHUP | EPOLLERR))
+            ev = EV_READ | EV_WRITE;
+        else {
+            if (what & EPOLLIN)
+                ev |= EV_READ;
+            if (what & EPOLLOUT)
+                ev |= EV_WRITE;
+        }
+
+        if (!ev)
+            continue;
+
+        evmap_io_active(base, events[i].data.fd, ev | EV_ET);
     }
 
 	if (res == epollop->nevents && epollop->nevents < MAX_NEVENT) {

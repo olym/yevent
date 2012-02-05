@@ -21,15 +21,18 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "event.h"
 #include "event-internal.h"
 #include "epoll.h"
+#include "eventfd.h"
 
 /* Prototypes */
 static inline int event_add_internal(struct event *ev,
     const struct timeval *tv, int tv_is_absolute);
 static inline int event_del_internal(struct event *ev);
+static int event_haveevents(struct event_base *base);
 
 static void	event_queue_insert(struct event_base *, struct event *, int);
 static void	event_queue_remove(struct event_base *, struct event *, int);
@@ -40,7 +43,7 @@ event_base_new()
 {
     struct event_base *base;
 
-    if (base = malloc(sizeof(struct event_base))) {
+    if ((base = malloc(sizeof(struct event_base))) == NULL) {
         fprintf(stderr, "%s: calloc\n", __func__);
         return NULL;
     }
@@ -97,7 +100,7 @@ event_base_priority_init(struct event_base *base, int npriorities)
 		return (0);
 
 	if (base->nactivequeues) {
-		mm_free(base->activequeues);
+		free(base->activequeues);
 		base->nactivequeues = 0;
 	}
 
@@ -238,6 +241,14 @@ done:
     return retval;
 }
 
+/* Returns true iff we're currently watching any events. */
+static int
+event_haveevents(struct event_base *base)
+{
+	/* Caller must hold th_base_lock */
+	return (base->event_count > 0);
+}
+
 int
 event_assign(struct event *ev, struct event_base *base, evutil_socket_t fd, short events, void (*callback)(evutil_socket_t, short, void *), void *arg)
 {
@@ -250,9 +261,11 @@ event_assign(struct event *ev, struct event_base *base, evutil_socket_t fd, shor
     ev->ev_flags = EVLIST_INIT;
 
     if (events & EV_SIGNAL) {
-        ev->ev_fd = signal_createfd(fd);
+        ev->ev_fd = signalfd_create(fd);
+        ev->ev_events |= EV_READ;
     } else if (events & EV_TIMEOUT) {
         ev->ev_fd = create_timerfd();
+        ev->ev_events |= EV_READ;
     }
     if (events & EV_PERSIST) {
         ev->ev_closure = EV_CLOSURE_PERSIST;
@@ -319,6 +332,9 @@ event_add_internal(struct event *ev, const struct timeval *tv,
     struct event_base *base = ev->ev_base;
     int res = 0;
 
+    if (ev->ev_events & EV_TIMEOUT) {
+        set_timerfd(ev->ev_fd, tv);
+    }
     if (!(ev->ev_flags & (EVLIST_INSERTED|EVLIST_ACTIVE))) {
         res = evmap_io_add(base, ev->ev_fd, ev);
         if (res != -1)
@@ -332,7 +348,7 @@ event_add(struct event *ev, const struct timeval *tv)
 	int res;
 
 	if (!ev->ev_base) {
-		event_warnx("%s: event has no event_base set.", __func__);
+		fprintf(stderr, "%s: event has no event_base set.", __func__);
 		return -1;
 	}
 
@@ -371,8 +387,8 @@ event_del(struct event *ev)
 {
 	int res;
 
-	if (EVUTIL_FAILURE_CHECK(!ev->ev_base)) {
-		event_warnx("%s: event has no event_base set.", __func__);
+	if (!ev->ev_base) {
+		fprintf(stderr, "%s: event has no event_base set.", __func__);
 		return -1;
 	}
 
@@ -388,8 +404,8 @@ event_del(struct event *ev)
 void
 event_active(struct event *ev, int res)
 {
-	if (EVUTIL_FAILURE_CHECK(!ev->ev_base)) {
-		event_warnx("%s: event has no event_base set.", __func__);
+	if (!ev->ev_base) {
+		fprintf(stderr, "%s: event has no event_base set.", __func__);
 		return;
 	}
 
@@ -431,7 +447,7 @@ event_queue_remove(struct event_base *base, struct event *ev, int queue)
         TAILQ_REMOVE(&base->activequeues[ev->ev_pri], ev, ev_active_next);
         break;
     default:
-        fprint(stderr, "%s: unknown queue %x", __func__, queue);
+        fprintf(stderr, "%s: unknown queue %x", __func__, queue);
     }
 }
 
@@ -449,6 +465,7 @@ event_queue_insert(struct event_base *base, struct event *ev, int queue)
 		return;
 	}
 
+    base->event_count++;
 	ev->ev_flags |= queue;
 	switch (queue) {
 	case EVLIST_INSERTED:

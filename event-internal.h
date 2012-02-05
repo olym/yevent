@@ -22,8 +22,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 #include <stdint.h>
 #include <sys/queue.h>
+#include <sys/time.h>
 
 #define evutil_socket_t int
 

@@ -20,5 +20,5 @@
 #include <time.h>
 int create_timerfd();
 void set_timerfd(int timerfd, const struct timeval *tv);
-int signalfd_creat(int signo);
+int signalfd_create(int signo);
 #endif

@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <stdio.h>
-
+#include "eventfd.h"
 int create_timerfd()
 {
     int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
@@ -51,7 +51,7 @@ void set_timerfd(int timerfd, const struct timeval *tv)
   }
 }
 
-int signalfd_creat(int signo)
+int signalfd_create(int signo)
 {
     sigset_t mask;
     int sfd;
