@@ -23,7 +23,11 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <stdio.h>
+#include <stdint.h>
 #include "eventfd.h"
+//TODO
+#include "event-internal.h"
+
 int create_timerfd()
 {
     int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
@@ -71,4 +75,20 @@ int signalfd_create(int signo)
     }
 
     return sfd;
+}
+
+void handle_signal(struct event *ev)
+{
+    struct signalfd_siginfo fdsi;
+    int s = read(ev->ev_fd, &fdsi, sizeof(struct signalfd_siginfo));
+    if (s != sizeof(struct signalfd_siginfo))
+        fprintf(stderr, "%s: read error \n", __func__);
+    printf("Catch signal %d\n", fdsi.ssi_signo);
+}
+void handle_timeout(struct event *ev)
+{
+    uint64_t exp;
+    int s = read(ev->ev_fd, &exp, sizeof(uint64_t));
+    if (s != sizeof(uint64_t))
+        fprintf(stderr, "%s: read error \n", __func__);
 }

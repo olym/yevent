@@ -30,6 +30,7 @@ extern "C" {
 #endif
 #include "event-internal.h"
 
+struct event_base* event_init(void);
 /**
   Initialize the event API.
 

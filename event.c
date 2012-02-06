@@ -124,6 +124,13 @@ event_base_priority_init(struct event_base *base, int npriorities)
 static inline void
 event_persist_closure(struct event_base *base, struct event *ev)
 {
+    if (ev->ev_events & EV_SIGNAL) {
+        handle_signal(ev);
+    }
+    if (ev->ev_events & EV_TIMEOUT) {
+        handle_timeout(ev);
+        set_timerfd(ev->ev_fd, &(ev->ev_timeout));
+    }
 	(*ev->ev_callback)((int)ev->ev_fd, ev->ev_res, ev->ev_arg);
 }
 
@@ -143,9 +150,9 @@ event_process_active_single_queue(struct event_base *base,
     assert(activeq != NULL);
 
     for (ev = TAILQ_FIRST(activeq); ev; ev = TAILQ_FIRST(activeq)) {
-        if (ev->ev_events & EV_PERSIST)
+        if (ev->ev_events & EV_PERSIST){
             event_queue_remove(base, ev, EVLIST_ACTIVE);
-        else
+        }else
             event_del_internal(ev);
         ++count;
 
@@ -155,6 +162,8 @@ event_process_active_single_queue(struct event_base *base,
                 break;
             default:
             case EV_CLOSURE_NONE:
+                if (ev->ev_events & EV_TIMEOUT)
+                    handle_timeout(ev);
                 (*ev->ev_callback)(
                         (int)ev->ev_fd, ev->ev_res, ev->ev_arg);
                 break;
@@ -262,12 +271,12 @@ event_assign(struct event *ev, struct event_base *base, evutil_socket_t fd, shor
 
     if (events & EV_SIGNAL) {
         ev->ev_fd = signalfd_create(fd);
-        ev->ev_events |= EV_READ;
+        ev->ev_events |= EV_READ | EV_PERSIST;
     } else if (events & EV_TIMEOUT) {
         ev->ev_fd = create_timerfd();
         ev->ev_events |= EV_READ;
     }
-    if (events & EV_PERSIST) {
+    if (ev->ev_events & EV_PERSIST) {
         ev->ev_closure = EV_CLOSURE_PERSIST;
     } else {
         ev->ev_closure = EV_CLOSURE_NONE;
@@ -332,7 +341,8 @@ event_add_internal(struct event *ev, const struct timeval *tv,
     struct event_base *base = ev->ev_base;
     int res = 0;
 
-    if (ev->ev_events & EV_TIMEOUT) {
+    if (ev->ev_events & EV_TIMEOUT && tv != NULL) {
+        ev->ev_timeout = *tv;
         set_timerfd(ev->ev_fd, tv);
     }
     if (!(ev->ev_flags & (EVLIST_INSERTED|EVLIST_ACTIVE))) {
@@ -441,6 +451,7 @@ event_queue_remove(struct event_base *base, struct event *ev, int queue)
     switch (queue) {
     case EVLIST_INSERTED :
         TAILQ_REMOVE(&base->eventqueue, ev, ev_next);
+        base->event_count--;
         break;
     case EVLIST_ACTIVE :
         base->event_count_active--;
@@ -465,11 +476,11 @@ event_queue_insert(struct event_base *base, struct event *ev, int queue)
 		return;
 	}
 
-    base->event_count++;
 	ev->ev_flags |= queue;
 	switch (queue) {
 	case EVLIST_INSERTED:
 		TAILQ_INSERT_TAIL(&base->eventqueue, ev, ev_next);
+        base->event_count++;
 		break;
 	case EVLIST_ACTIVE:
 		base->event_count_active++;
