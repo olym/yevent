@@ -15,9 +15,50 @@
  *
  * =====================================================================================
  */
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <time.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/syscall.h>
+#include <assert.h>
 
+#include "thread.h"
 
 static pthread_mutexattr_t attr_recursive;
+
+pid_t tid()
+{
+    pid_t tid;
+    tid = syscall(SYS_gettid);
+    return tid;
+}
+struct thread *thread_init(const char* name, thread_cb_fn thread_cb, void *args)
+{
+    struct thread *thd;
+    thd = malloc(sizeof(struct thread));
+    if (thd == NULL) {
+        fprintf(stderr, "%s:malloc error\n", __func__);
+        return NULL;
+    }
+    thd->name = strdup(name);
+    thd->thread_cb = thread_cb;
+    thd->args = args;
+    thd->tid = 0;
+    thd->pthreadid = 0;
+    return thd;
+}
+void thread_start(struct thread* thd)
+{
+    thd->started = 1;
+    pthread_create(&thd->pthreadid, NULL, thd->thread_cb, thd->args);
+}
+void thread_join(struct thread* thd)
+{
+    assert(thd->started);
+    pthread_join(thd->pthreadid, NULL);
+}
 
 void *
 evthread_posix_lock_alloc(unsigned locktype)
@@ -46,7 +87,7 @@ evthread_posix_lock_free(void *_lock, unsigned locktype)
 void
 evthread_posix_lock(void *_lock, unsigned mode)
 {
-    pthread_mutex_t *lock = _lock
+    pthread_mutex_t *lock = _lock;
     if (mode & EVTHREAD_TRY) {
         pthread_mutex_trylock(lock);
     } else {
@@ -96,15 +137,16 @@ evthread_posix_cond_wait(void *_cond, void *_lock, const struct timeval *tv)
 {
     pthread_cond_t *cond = _cond;
     pthread_mutex_t *lock = _lock;
+    int r;
 
     if (tv) {
         struct timeval now, abstime;
         struct timespec ts;
         gettimeofday(&now, NULL);
         timeradd(&now, tv, &abstime);
-        ts.ts_sec = abstime.tv_sec;
-        ts.ts_nsec = abstime.tv_usec * 1000
-        r = pthread_cond_timewait(cond, lock, &ts);
+        ts.tv_sec = abstime.tv_sec;
+        ts.tv_nsec = abstime.tv_usec * 1000;
+        r = pthread_cond_timedwait(cond, lock, &ts);
         if (r = ETIMEDOUT)
             return 1;
         else if (r)
@@ -127,5 +169,5 @@ evthread_posix_cond_signal(void *_cond, int broadcast)
     else
         r = pthread_cond_signal(cond);
 
-    return r?-1:0
+    return r?-1:0;
 }
