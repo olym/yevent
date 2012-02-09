@@ -87,7 +87,7 @@ thread_pool_start(struct thread_pool* pool)
 }
 
 int
-thread_pool_signal_run(struct thread_pool *pool, task_cb_fn task_cb, void* args)
+thread_pool_run(struct thread_pool *pool, task_cb_fn task_cb, void* args)
 {
     if (pool->running == 0) {
         task_cb(args);
@@ -133,6 +133,7 @@ static void *
 _thread_pool_wait_run(void* args)
 {
     struct thread_pool *pool = args;
+    printf("%s:thread %d\n", __func__, tid());
     while(pool->running) {
         struct task *task = _thread_pool_take(pool);
         if (task)

@@ -50,6 +50,6 @@ struct thread_pool
 struct thread_pool *thread_pool_init(const char* name, int num_threads);
 void thread_pool_stop(struct thread_pool* pool);
 int thread_pool_start(struct thread_pool* pool);
-int thread_pool_signal_run(struct thread_pool *pool, task_cb_fn task_cb, void* args);
+int thread_pool_run(struct thread_pool *pool, task_cb_fn task_cb, void* args);
 
 #endif 

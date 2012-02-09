@@ -125,10 +125,10 @@ static inline void
 event_persist_closure(struct event_base *base, struct event *ev)
 {
     if (ev->ev_events & EV_SIGNAL) {
-        handle_signal(ev);
+        read_signalfd(ev->ev_fd);
     }
     if (ev->ev_events & EV_TIMEOUT) {
-        handle_timeout(ev);
+        read_timerfd(ev->ev_fd);
         set_timerfd(ev->ev_fd, &(ev->ev_timeout));
     }
 	(*ev->ev_callback)((int)ev->ev_fd, ev->ev_res, ev->ev_arg);
@@ -163,7 +163,7 @@ event_process_active_single_queue(struct event_base *base,
             default:
             case EV_CLOSURE_NONE:
                 if (ev->ev_events & EV_TIMEOUT)
-                    handle_timeout(ev);
+                    read_timerfd(ev->ev_fd);
                 (*ev->ev_callback)(
                         (int)ev->ev_fd, ev->ev_res, ev->ev_arg);
                 break;

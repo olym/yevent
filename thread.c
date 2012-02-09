@@ -49,10 +49,18 @@ struct thread *thread_init(const char* name, thread_cb_fn thread_cb, void *args)
     thd->pthreadid = 0;
     return thd;
 }
+static void *_thread_start(void *args)
+{
+    struct thread *thd = args;
+    thd->tid = tid();
+    thd->pthreadid = pthread_self();
+    thd->thread_cb(thd->args);
+    return NULL;
+}
 void thread_start(struct thread* thd)
 {
     thd->started = 1;
-    pthread_create(&thd->pthreadid, NULL, thd->thread_cb, thd->args);
+    pthread_create(&thd->pthreadid, NULL, _thread_start, thd);
 }
 void thread_join(struct thread* thd)
 {

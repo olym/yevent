@@ -77,18 +77,19 @@ int signalfd_create(int signo)
     return sfd;
 }
 
-void handle_signal(struct event *ev)
+void read_signalfd(int timerfd)
 {
     struct signalfd_siginfo fdsi;
-    int s = read(ev->ev_fd, &fdsi, sizeof(struct signalfd_siginfo));
+    int s = read(timerfd, &fdsi, sizeof(struct signalfd_siginfo));
     if (s != sizeof(struct signalfd_siginfo))
         fprintf(stderr, "%s: read error \n", __func__);
     printf("Catch signal %d\n", fdsi.ssi_signo);
 }
-void handle_timeout(struct event *ev)
+void read_timerfd(int signalfd)
 {
     uint64_t exp;
-    int s = read(ev->ev_fd, &exp, sizeof(uint64_t));
+    int s = read(signalfd, &exp, sizeof(uint64_t));
     if (s != sizeof(uint64_t))
         fprintf(stderr, "%s: read error \n", __func__);
 }
+
