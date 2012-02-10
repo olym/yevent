@@ -51,9 +51,9 @@ event_base_new()
     TAILQ_INIT(&base->eventqueue);
 
     evmap_io_initmap(&base->iomap);
+    base->wakeupfd = create_eventfd();
 
     base->evdata = NULL;
-
     base->evdata = epoll_init();
     if (base->evdata == NULL) {
         fprintf(stderr, "%s: no epoll_init error\n", __func__);

@@ -101,7 +101,7 @@ struct event_base {
 	/** Set if we're running the event_base_loop function, to prevent
 	 * reentrant invocation. */
 	int running_loop;
-
+    int wakeupfd;
 	/* Active event management. */
 	/** An array of nactivequeues queues for active events (ones that
 	 * have triggered, and whose callbacks need to be called).  Low
