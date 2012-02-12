@@ -26,7 +26,7 @@ extern "C" {
 #include <stdint.h>
 #include <sys/queue.h>
 #include <sys/time.h>
-
+#include "defer-internal.h"
 #define evutil_socket_t int
 
 #define EVENT_MAX_PRIORITIES 256
@@ -71,8 +71,11 @@ TAILQ_HEAD (event_list, event);
 /** Select edge-triggered behavior, if supported by the backend. */
 #define EV_ET       0x20
 
-#define EVLIST_INSERTED	0x01
-#define EVLIST_ACTIVE   0x02
+#define EVLIST_TIMEOUT  0x01
+#define EVLIST_INSERTED	0x02
+#define EVLIST_SIGNAL 0x04
+#define EVLIST_ACTIVE   0x08
+#define EVLIST_INTERNAL 0x10
 #define EVLIST_INIT	0x80
 
 /* Possible values for ev_closure in struct event. */
@@ -101,7 +104,12 @@ struct event_base {
 	/** Set if we're running the event_base_loop function, to prevent
 	 * reentrant invocation. */
 	int running_loop;
-    int wakeupfd;
+
+	/** True if the base already has a pending notify, and we don't need
+	 * to add any more. */
+    int is_notify_pending;
+    int notifyfd;
+    struct event notify_ev;
 	/* Active event management. */
 	/** An array of nactivequeues queues for active events (ones that
 	 * have triggered, and whose callbacks need to be called).  Low
@@ -111,10 +119,20 @@ struct event_base {
 	/** The length of the activequeues array */
 	int nactivequeues;
 
+    struct deferred_cb_queue defer_queue;
+
 	/** Mapping from file descriptors to enabled (added) events */
 	struct event_io_map iomap;
 	/** All events that have been enabled (added) in this event_base */
 	struct event_list eventqueue;
+
+	/* threading support */
+	/** The thread currently running the event_loop for this base */
+	unsigned long th_owner_id;
+	/** A lock to prevent conflicting accesses to this event_base */
+	void *th_base_lock;
+	/** The event whose callback is executing right now */
+	struct event *current_event;
 };
 
 #define N_ACTIVE_CALLBACKS(base)					\

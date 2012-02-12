@@ -20,11 +20,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/eventfd.h>
 #include <stdio.h>
 #include <assert.h>
 
 #include "event.h"
 #include "event-internal.h"
+#include "defer-internal.h"
+#include "thread.h"
 #include "epoll.h"
 #include "eventfd.h"
 
@@ -37,11 +40,16 @@ static int event_haveevents(struct event_base *base);
 static void	event_queue_insert(struct event_base *, struct event *, int);
 static void	event_queue_remove(struct event_base *, struct event *, int);
 static int	event_process_active(struct event_base *);
+static int event_process_deferred_active(struct deferred_cb_queue *, int *);
+static void notify_base_cbq_callback(struct deferred_cb_queue *cb, void *baseptr);
+static int evthread_notify_base(struct event_base *base);
+static void evthread_notify_read(int fd, short what, void *args);
 
 struct event_base *
 event_base_new()
 {
     struct event_base *base;
+    int r;
 
     if ((base = malloc(sizeof(struct event_base))) == NULL) {
         fprintf(stderr, "%s: calloc\n", __func__);
@@ -50,23 +58,38 @@ event_base_new()
 
     TAILQ_INIT(&base->eventqueue);
 
+	event_deferred_cb_queue_init(&base->defer_queue);
+	base->defer_queue.notify_fn = notify_base_cbq_callback;
+	base->defer_queue.notify_arg = base;
+    
     evmap_io_initmap(&base->iomap);
-    base->wakeupfd = create_eventfd();
 
     base->evdata = NULL;
     base->evdata = epoll_init();
+
     if (base->evdata == NULL) {
         fprintf(stderr, "%s: no epoll_init error\n", __func__);
         event_base_free(base);
         return NULL;
     }
 
+    //support thread
+    base->th_base_lock = thread_posix_lock_alloc(0);
+    base->defer_queue.lock = base->th_base_lock;
+	/* prepare an event that we can use for wakeup */
+    r = evthread_make_base_notifiable(base);
+    if (r<0) {
+        event_base_free(base);
+        return NULL;
+    }
+
+
 	/* allocate a single active event queue */
 	if (event_base_priority_init(base, 1) < 0) {
 		event_base_free(base);
 		return NULL;
 	}
-
+    
     return base;
 
 }
@@ -124,6 +147,7 @@ event_base_priority_init(struct event_base *base, int npriorities)
 static inline void
 event_persist_closure(struct event_base *base, struct event *ev)
 {
+    thread_posix_unlock(base->th_base_lock, 0);
     if (ev->ev_events & EV_SIGNAL) {
         read_signalfd(ev->ev_fd);
     }
@@ -162,6 +186,7 @@ event_process_active_single_queue(struct event_base *base,
                 break;
             default:
             case EV_CLOSURE_NONE:
+                thread_posix_unlock(base->th_base_lock, 0);
                 if (ev->ev_events & EV_TIMEOUT)
                     read_timerfd(ev->ev_fd);
                 (*ev->ev_callback)(
@@ -169,9 +194,12 @@ event_process_active_single_queue(struct event_base *base,
                 break;
         }
 
+        thread_posix_lock(base->th_base_lock, 0);
 		if (base->event_break)
 			return -1;
     }
+
+    return count;
 }
 
 /*
@@ -182,6 +210,7 @@ event_process_active_single_queue(struct event_base *base,
 static int
 event_process_active(struct event_base *base)
 {
+    printf("%s\n", __func__);
     struct event_list *activeq = NULL;
     int i, c = 0;
 
@@ -195,7 +224,35 @@ event_process_active(struct event_base *base)
                 break;
         }
     }
+    //TODO
+    event_process_deferred_active(&base->defer_queue, &base->event_break);
     return c;
+}
+
+static int
+event_process_deferred_active(struct deferred_cb_queue *queue, int *breakptr)
+{
+	int count = 0;
+	struct deferred_cb *cb;
+
+#define MAX_DEFERRED 16
+	while ((cb = TAILQ_FIRST(&queue->deferred_cb_list))) {
+		cb->queued = 0;
+		TAILQ_REMOVE(&queue->deferred_cb_list, cb, cb_next);
+		--queue->active_count;
+		UNLOCK_DEFERRED_QUEUE(queue);
+
+		cb->cb(cb, cb->arg);
+
+		LOCK_DEFERRED_QUEUE(queue);
+		if (*breakptr)
+			return -1;
+		if (++count == MAX_DEFERRED)
+			break;
+	}
+#undef MAX_DEFERRED
+	return count;
+
 }
 
 int
@@ -204,10 +261,12 @@ event_base_dispatch(struct event_base *base)
     int retval = 0;
     int res;
 
+	thread_posix_lock(base->th_base_lock, 0);
+
 	if (base->running_loop) {
 		fprintf(stderr, "%s: reentrant invocation.  Only one event_base_loop"
 		    " can run on each event_base at once.", __func__);
-		//EVBASE_RELEASE_LOCK(base, th_base_lock);
+		thread_posix_unlock(base->th_base_lock, 0);
 		return -1;
 	}
 
@@ -215,7 +274,7 @@ event_base_dispatch(struct event_base *base)
 
     int done = 0;
 
-    //base->th_owner_id = EVTHREAD_GET_ID();
+    base->th_owner_id = EVTHREAD_GET_ID();
 
     base->event_break = 0;
 
@@ -224,11 +283,11 @@ event_base_dispatch(struct event_base *base)
             break;
 
 		/* If we have no events, we just exit */
-		if (!event_haveevents(base) && !N_ACTIVE_CALLBACKS(base)) {
-			fprintf(stderr, "%s: no events registered.", __func__);
-			retval = 1;
-			goto done;
-		}
+		//if (!event_haveevents(base) && !N_ACTIVE_CALLBACKS(base)) {
+		//	fprintf(stderr, "%s: no events registered\n", __func__);
+		//	retval = 1;
+		//	goto done;
+		//}
 
         res = epoll_dispatch(base, NULL);
 
@@ -246,6 +305,8 @@ event_base_dispatch(struct event_base *base)
     }
 done:
     base->running_loop = 0;
+
+    thread_posix_unlock(base->th_base_lock, 0);
 
     return retval;
 }
@@ -340,6 +401,7 @@ event_add_internal(struct event *ev, const struct timeval *tv,
 {
     struct event_base *base = ev->ev_base;
     int res = 0;
+    int wakeup = 0;
 
     if (ev->ev_events & EV_TIMEOUT && tv != NULL) {
         ev->ev_timeout = *tv;
@@ -349,24 +411,34 @@ event_add_internal(struct event *ev, const struct timeval *tv,
         res = evmap_io_add(base, ev->ev_fd, ev);
         if (res != -1)
             event_queue_insert(base, ev, EVLIST_INSERTED);
+        if (res == 1) {
+            wakeup = 1;
+            res = 0;
+        }
     }
+
+    if (res != -1 && wakeup && EVBASE_NEED_NOTIFY(base))
+        evthread_notify_base(base);
+
+    return res;
 }
 
 int
 event_add(struct event *ev, const struct timeval *tv)
 {
 	int res;
-
 	if (!ev->ev_base) {
 		fprintf(stderr, "%s: event has no event_base set.", __func__);
 		return -1;
 	}
 
-	//EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
+    struct event_base *base = ev->ev_base;
+
+	thread_posix_lock(base->th_base_lock, 0);
 
 	res = event_add_internal(ev, tv, 0);
 
-	//EVBASE_RELEASE_LOCK(ev->ev_base, th_base_lock);
+	thread_posix_unlock(base->th_base_lock, 0);
 
 	return (res);
 }
@@ -377,17 +449,29 @@ event_del_internal(struct event *ev)
 {
     struct event_base *base;
     int res = 0;
+    int wakeup = 0;
 
     if (ev->ev_base == NULL)
         return -1;
     base = ev->ev_base;
 
+    //if (ev->ev_flags & EVLIST_TIMEOUT) {
+    //    event_queue_remove(base, ev, EVLIST_TIMEOUT);
+    //}
     if (ev->ev_flags & EVLIST_ACTIVE)
         event_queue_remove(base, ev, EVLIST_ACTIVE);
+
     if (ev->ev_flags & EVLIST_INSERTED) {
         event_queue_remove(base, ev, EVLIST_INSERTED);
         res = evmap_io_del(base, ev->ev_fd, ev);
+        if (res == 1) {
+            wakeup = 1;
+            res = 0;
+        }
     }
+
+    if (res != -1 && wakeup && EVBASE_NEED_NOTIFY(base))
+        evthread_notify_base(base);
 
     return res;
 }
@@ -401,16 +485,80 @@ event_del(struct event *ev)
 		fprintf(stderr, "%s: event has no event_base set.", __func__);
 		return -1;
 	}
+    struct event_base *base = ev->ev_base;
 
-	//EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
+	thread_posix_lock(base->th_base_lock, 0);
 
 	res = event_del_internal(ev);
 
-	//EVBASE_RELEASE_LOCK(ev->ev_base, th_base_lock);
+	thread_posix_unlock(base->th_base_lock, 0);
 
 	return (res);
 }
 
+void
+event_deferred_cb_queue_init(struct deferred_cb_queue *cb)
+{
+	memset(cb, 0, sizeof(struct deferred_cb_queue));
+	TAILQ_INIT(&cb->deferred_cb_list);
+}
+
+/** Helper for the deferred_cb queue: wake up the event base. */
+static void
+notify_base_cbq_callback(struct deferred_cb_queue *cb, void *baseptr)
+{
+	struct event_base *base = baseptr;
+    printf("base->th_own_id = %d tid = %d runting = %d\n", base->th_owner_id, tid(), base->running_loop);
+	if (EVBASE_NEED_NOTIFY(base)) {
+        printf("%s\n", __func__);
+		evthread_notify_base(base);
+    }
+}
+
+void
+event_deferred_cb_init(struct deferred_cb *cb, deferred_cb_fn fn, void *arg)
+{
+	memset(cb, 0, sizeof(struct deferred_cb));
+	cb->cb = fn;
+	cb->arg = arg;
+}
+
+void
+event_deferred_cb_cancel(struct deferred_cb_queue *queue,
+    struct deferred_cb *cb)
+{
+	if (!queue) {
+        return;
+	}
+
+	LOCK_DEFERRED_QUEUE(queue);
+	if (cb->queued) {
+		TAILQ_REMOVE(&queue->deferred_cb_list, cb, cb_next);
+		--queue->active_count;
+		cb->queued = 0;
+	}
+	UNLOCK_DEFERRED_QUEUE(queue);
+}
+
+void
+event_deferred_cb_schedule(struct deferred_cb_queue *queue,
+    struct deferred_cb *cb)
+{
+	if (!queue) {
+        return;
+	}
+
+	LOCK_DEFERRED_QUEUE(queue);
+	if (!cb->queued) {
+		cb->queued = 1;
+		TAILQ_INSERT_TAIL(&queue->deferred_cb_list, cb, cb_next);
+		++queue->active_count;
+		if (queue->notify_fn) {
+			queue->notify_fn(queue, queue->notify_arg);
+        }
+	}
+	UNLOCK_DEFERRED_QUEUE(queue);
+}
 void
 event_active(struct event *ev, int res)
 {
@@ -418,12 +566,13 @@ event_active(struct event *ev, int res)
 		fprintf(stderr, "%s: event has no event_base set.", __func__);
 		return;
 	}
+    struct event_base *base = ev->ev_base;
 
-	//EVBASE_ACQUIRE_LOCK(ev->ev_base, th_base_lock);
+	thread_posix_lock(base->th_base_lock, 0);
 
 	event_active_nolock(ev, res);
 
-	//EVBASE_RELEASE_LOCK(ev->ev_base, th_base_lock);
+	thread_posix_unlock(base->th_base_lock, 0);
 }
 
 void
@@ -447,11 +596,13 @@ event_queue_remove(struct event_base *base, struct event *ev, int queue)
         return;
     }
 
+	if (~ev->ev_flags & EVLIST_INTERNAL)
+		base->event_count--;
+
     ev->ev_flags &= ~queue;
     switch (queue) {
     case EVLIST_INSERTED :
         TAILQ_REMOVE(&base->eventqueue, ev, ev_next);
-        base->event_count--;
         break;
     case EVLIST_ACTIVE :
         base->event_count_active--;
@@ -475,12 +626,12 @@ event_queue_insert(struct event_base *base, struct event *ev, int queue)
 			   ev, ev->ev_fd, queue);
 		return;
 	}
-
+    if (~ev->ev_flags & EVLIST_INTERNAL)
+        base->event_count++;
 	ev->ev_flags |= queue;
 	switch (queue) {
 	case EVLIST_INSERTED:
 		TAILQ_INSERT_TAIL(&base->eventqueue, ev, ev_next);
-        base->event_count++;
 		break;
 	case EVLIST_ACTIVE:
 		base->event_count_active++;
@@ -491,3 +642,54 @@ event_queue_insert(struct event_base *base, struct event *ev, int queue)
 		fprintf(stderr, "%s: unknown queue %x", __func__, queue);
 	}
 }
+static void
+evthread_notify_read(int fd, short what, void *args)
+{
+    struct event_base *base = args;
+    uint64_t one;
+    int n = read(base->notifyfd, &one, sizeof(one));
+    if (n != sizeof one) {
+        fprintf(stderr, "%s: read error\n", __func__);
+    }
+    thread_posix_lock(base->th_base_lock, 0);
+    base->is_notify_pending = 0;
+    thread_posix_unlock(base->th_base_lock, 0);
+}
+
+/** Tell the thread currently running the event_loop for base (if any) that it
+ * needs to stop waiting in its dispatch function (if it is) and process all
+ * active events and deferred callbacks (if there are any).  */
+static int
+evthread_notify_base(struct event_base *base)
+{
+    printf("%s: tid = %ld\n", __func__, base->th_owner_id);
+  uint64_t one = 1;
+  //if the base already has a pending notify, we don't need to write any more
+  if (!base->is_notify_pending) {
+      base->is_notify_pending = 1;
+      ssize_t n = write(base->notifyfd, &one, sizeof one);
+      if (n != sizeof one) {
+          fprintf(stderr, "%s:write %d bytes instead of 8", __func__, n);
+      }
+  }
+}
+int
+evthread_make_base_notifiable(struct event_base *base)
+{
+    if (!base)
+        return -1;
+    base->notifyfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if (base->notifyfd < 0) {
+        fprintf(stderr, "%s:Failed to create event fd\n", __func__);
+        return -1;
+    }
+	event_assign(&base->notify_ev, base, base->notifyfd,
+				 EV_READ|EV_PERSIST, evthread_notify_read, base);
+
+	/* we need to mark this as internal event */
+	base->notify_ev.ev_flags |= EVLIST_INTERNAL;
+	event_priority_set(&base->notify_ev, 0);
+
+	return event_add(&base->notify_ev, NULL);
+}
+

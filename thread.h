@@ -32,6 +32,13 @@
  * return nonzero from the locking callback. */
 #define EVTHREAD_TRY    0x10
 
+#define EVTHREAD_GET_ID() tid()
+#define EVBASE_IN_THREAD(base)				\
+	((base)->th_owner_id == tid())
+#define EVBASE_NEED_NOTIFY(base)			 \
+	((base)->running_loop &&			 \
+	    ((base)->th_owner_id != tid()))
+
 typedef void* (*thread_cb_fn)(void *);
 
 struct thread {
@@ -43,18 +50,19 @@ struct thread {
     void *args;
 };
 
+pid_t tid();
 struct thread *thread_init(const char* name, thread_cb_fn thread_cb, void *args);
 void thread_start(struct thread* thd);
 void thread_join(struct thread* thd);
 
-void * evthread_posix_lock_alloc(unsigned locktype);
-void evthread_posix_lock_free(void *_lock, unsigned locktype);
-void evthread_posix_lock(void *_lock, unsigned mode);
-void evthread_posix_unlock(void *_lock, unsigned mode);
-unsigned long evthread_posix_get_id(void);
-void* evthread_posix_cond_alloc();
-void evthread_posix_cond_free(void *_cond);
-int evthread_posix_cond_wait(void *_cond, void *_lock, const struct timeval *tv);
-int evthread_posix_cond_signal(void *_cond, int broadcast);
+void * thread_posix_lock_alloc(unsigned locktype);
+void thread_posix_lock_free(void *_lock, unsigned locktype);
+void thread_posix_lock(void *_lock, unsigned mode);
+void thread_posix_unlock(void *_lock, unsigned mode);
+unsigned long thread_posix_get_id(void);
+void* thread_posix_cond_alloc();
+void thread_posix_cond_free(void *_cond);
+int thread_posix_cond_wait(void *_cond, void *_lock, const struct timeval *tv);
+int thread_posix_cond_signal(void *_cond, int broadcast);
 
 #endif

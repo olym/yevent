@@ -136,8 +136,11 @@ epoll_dispatch(struct event_base *base, struct timeval *tv)
 	struct epoll_event *events = epollop->events;
     int res;
 
+    thread_posix_unlock(base->th_base_lock, 0);
     res = epoll_wait(epollop->epfd, events, epollop->nevents, 
             tv ? (tv->tv_sec*1000 + tv->tv_usec/1000) : -1);
+    thread_posix_lock(base->th_base_lock, 0);
+
     int i;
     for (i = 0; i < res; i++) {
         //event_base->activefd[i] = epollop->events[i].data.fd;

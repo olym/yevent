@@ -46,8 +46,8 @@ thread_pool_init(const char* name, int num_threads)
     pool->running = 0;
     TAILQ_INIT(&pool->taskqueue);
     //init mutex and cond
-    pool->lock = evthread_posix_lock_alloc(0);
-    pool->cond = evthread_posix_cond_alloc();
+    pool->lock = thread_posix_lock_alloc(0);
+    pool->cond = thread_posix_cond_alloc();
     
     return pool;
 }
@@ -57,14 +57,14 @@ thread_pool_stop(struct thread_pool* pool)
     int i;
 
     pool->running = 0;
-    evthread_posix_cond_signal(pool->cond, 1);
+    thread_posix_cond_signal(pool->cond, 1);
     for (i = 0; i < pool->num_threads; i++) {
         thread_join(pool->threads[i]);
     }
     free(pool->threads);
     pool->threads = NULL;
-    evthread_posix_lock_free(pool->lock, 0); 
-    evthread_posix_cond_free(pool->cond);
+    thread_posix_lock_free(pool->lock, 0); 
+    thread_posix_cond_free(pool->cond);
 }
 int
 thread_pool_start(struct thread_pool* pool)
@@ -92,7 +92,7 @@ thread_pool_run(struct thread_pool *pool, task_cb_fn task_cb, void* args)
     if (pool->running == 0) {
         task_cb(args);
     } else {
-        evthread_posix_lock(pool->lock, 0);
+        thread_posix_lock(pool->lock, 0);
 
         // put task in thread_pool queue;
         struct task *task = malloc(sizeof(struct task));
@@ -105,9 +105,9 @@ thread_pool_run(struct thread_pool *pool, task_cb_fn task_cb, void* args)
         TAILQ_INSERT_TAIL(&pool->taskqueue, task, task_next);
 
         // signal the thread to run the task;
-        evthread_posix_cond_signal(pool->cond, 1); // signal the thread to run the task;
+        thread_posix_cond_signal(pool->cond, 1); // signal the thread to run the task;
 
-        evthread_posix_unlock(pool->lock, 0);
+        thread_posix_unlock(pool->lock, 0);
     }
     return 0;
 }
@@ -115,9 +115,9 @@ thread_pool_run(struct thread_pool *pool, task_cb_fn task_cb, void* args)
 static struct task*
 _thread_pool_take(struct thread_pool* pool)
 {
-    evthread_posix_lock(pool->lock, 0);
+    thread_posix_lock(pool->lock, 0);
     while (TAILQ_EMPTY(&pool->taskqueue)) {
-        evthread_posix_cond_wait(pool->cond, pool->lock, NULL);
+        thread_posix_cond_wait(pool->cond, pool->lock, NULL);
     }
     struct task *task;
     if (!TAILQ_EMPTY(&pool->taskqueue)) {
@@ -125,7 +125,7 @@ _thread_pool_take(struct thread_pool* pool)
         task = TAILQ_FIRST(&pool->taskqueue);
         TAILQ_REMOVE(&pool->taskqueue, task, task_next);
     }
-    evthread_posix_unlock(pool->lock, 0);
+    thread_posix_unlock(pool->lock, 0);
     return task;
 }
 

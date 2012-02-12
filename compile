@@ -1,0 +1,1 @@
+gcc -fPIC -shared thread.c event.c epoll.c evmap.c eventfd.c ev_thread.c -o libyevent.so -lpthread

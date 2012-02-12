@@ -42,7 +42,10 @@ struct thread *thread_init(const char* name, thread_cb_fn thread_cb, void *args)
         fprintf(stderr, "%s:malloc error\n", __func__);
         return NULL;
     }
-    thd->name = strdup(name);
+    if (name != NULL)
+        thd->name = strdup(name);
+    else 
+        thd->name = NULL;
     thd->thread_cb = thread_cb;
     thd->args = args;
     thd->tid = 0;
@@ -65,11 +68,13 @@ void thread_start(struct thread* thd)
 void thread_join(struct thread* thd)
 {
     assert(thd->started);
+    if (thd->name)
+        free(thd->name);
     pthread_join(thd->pthreadid, NULL);
 }
 
 void *
-evthread_posix_lock_alloc(unsigned locktype)
+thread_posix_lock_alloc(unsigned locktype)
 {
 	pthread_mutexattr_t *attr = NULL;
 	pthread_mutex_t *lock = malloc(sizeof(pthread_mutex_t));
@@ -85,7 +90,7 @@ evthread_posix_lock_alloc(unsigned locktype)
 }
 
 void
-evthread_posix_lock_free(void *_lock, unsigned locktype)
+thread_posix_lock_free(void *_lock, unsigned locktype)
 {
     pthread_mutex_t *lock = _lock;
     pthread_mutex_destroy(lock);
@@ -93,7 +98,7 @@ evthread_posix_lock_free(void *_lock, unsigned locktype)
 }
 
 void
-evthread_posix_lock(void *_lock, unsigned mode)
+thread_posix_lock(void *_lock, unsigned mode)
 {
     pthread_mutex_t *lock = _lock;
     if (mode & EVTHREAD_TRY) {
@@ -104,14 +109,14 @@ evthread_posix_lock(void *_lock, unsigned mode)
 }
 
 void
-evthread_posix_unlock(void *_lock, unsigned mode)
+thread_posix_unlock(void *_lock, unsigned mode)
 {
     pthread_mutex_t *lock = _lock;
     pthread_mutex_unlock(lock);
 }
 
 unsigned long
-evthread_posix_get_id(void)
+thread_posix_get_id(void)
 {
     pthread_t thid;
     thid = pthread_self();
@@ -119,7 +124,7 @@ evthread_posix_get_id(void)
 }
 
 void*
-evthread_posix_cond_alloc()
+thread_posix_cond_alloc()
 {
     pthread_cond_t *cond = malloc(sizeof(pthread_cond_t));
     if (!cond)
@@ -133,7 +138,7 @@ evthread_posix_cond_alloc()
 }
 
 void
-evthread_posix_cond_free(void *_cond)
+thread_posix_cond_free(void *_cond)
 {
     pthread_cond_t *cond = _cond;
     pthread_cond_destroy(cond);
@@ -141,7 +146,7 @@ evthread_posix_cond_free(void *_cond)
 }
 
 int 
-evthread_posix_cond_wait(void *_cond, void *_lock, const struct timeval *tv)
+thread_posix_cond_wait(void *_cond, void *_lock, const struct timeval *tv)
 {
     pthread_cond_t *cond = _cond;
     pthread_mutex_t *lock = _lock;
@@ -168,7 +173,7 @@ evthread_posix_cond_wait(void *_cond, void *_lock, const struct timeval *tv)
 }
 
 int
-evthread_posix_cond_signal(void *_cond, int broadcast)
+thread_posix_cond_signal(void *_cond, int broadcast)
 {
     pthread_cond_t *cond = _cond;
     int r;    

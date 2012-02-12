@@ -92,22 +92,3 @@ void read_timerfd(int signalfd)
     if (s != sizeof(uint64_t))
         fprintf(stderr, "%s: read error \n", __func__);
 }
-
-int create_eventfd()
-{
-    int evtfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
-    if (evtfd < 0) {
-        fprintf(stderr, "%s:Failed to create event fd\n", __func__);
-        return -1;
-    }
-    return evtfd;
-}
-
-void read_eventfd(int evtfd)
-{
-    uint64_t one = 1;
-    int n = read(evtfd, &one, sizeof(one));
-    if (n != sizeof one) {
-        fprintf(stderr, "%s: read error\n", __func__);
-    }
-}
