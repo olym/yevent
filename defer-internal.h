@@ -67,6 +67,9 @@ void event_deferred_cb_cancel(struct deferred_cb_queue *, struct deferred_cb *);
  */
 void event_deferred_cb_schedule(struct deferred_cb_queue *, struct deferred_cb *);
 
+struct deferred_cb_queue *
+event_get_deferred_cb_queue(struct event_base *base);
+
 #define LOCK_DEFERRED_QUEUE(q)						\
     thread_posix_lock((q)->lock, 0)
 #define UNLOCK_DEFERRED_QUEUE(q)					\

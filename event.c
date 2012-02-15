@@ -560,6 +560,11 @@ event_deferred_cb_schedule(struct deferred_cb_queue *queue,
 	}
 	UNLOCK_DEFERRED_QUEUE(queue);
 }
+struct deferred_cb_queue *
+event_get_deferred_cb_queue(struct event_base *base)
+{
+	return base ? &base->defer_queue : NULL;
+}
 void
 event_active(struct event *ev, int res)
 {

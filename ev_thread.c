@@ -68,11 +68,10 @@ event_base_thread_init()
 static void *worker_event_thread(void *args)
 {
     struct event_base_thread *base_thread = args;
-
+    struct event ev;
     thread_posix_lock(base_thread->lock, 0);
     base_thread->base = event_init();
     thread_posix_cond_signal(base_thread->cond, 1);
     thread_posix_unlock(base_thread->lock, 0);
     event_base_dispatch(base_thread->base);
-    printf("%s:thread:event_base_dispach\n", __func__);
 }
