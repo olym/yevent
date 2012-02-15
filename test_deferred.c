@@ -30,10 +30,9 @@ int main(int argc, char *argv[])
     
     base = event_init();
     base_thread = event_base_thread_init();
-    sleep(2);
     event_deferred_cb_init(&cb, deferred_fun, NULL);
     event_deferred_cb_schedule(&base_thread->base->defer_queue, &cb);
-    //event_base_dispatch(base);
+    event_base_dispatch(base);
     sleep(7);
     return 0;
 }

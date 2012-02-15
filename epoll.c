@@ -42,7 +42,7 @@ epoll_init()
     int epfd;
     struct epollop *epollop;
 
-    if ((epfd = epoll_create(32000)) == -1) {
+    if ((epfd = epoll_create(1024)) == -1) {
         perror("epoll_create");
         return NULL;
     }
@@ -67,7 +67,7 @@ epoll_add(struct event_base* event_base, int fd, int mask)
 {
     struct epollop *epollop = event_base->evdata; 
     struct epoll_event ee;
-    //ee.events = EPOLLONESHOT;
+    ee.events = 0;
     if (mask & EV_READ) ee.events |= EPOLLIN;
     if (mask & EV_WRITE) ee.events |= EPOLLOUT;
     if (mask & EV_ET) ee.events |= EPOLLET;

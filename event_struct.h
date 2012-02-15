@@ -27,24 +27,6 @@
 extern "C" {
 #endif
 
-/* Fix so that people don't have to run with <sys/queue.h> */
-#ifndef TAILQ_ENTRY
-#define _EVENT_DEFINED_TQENTRY
-#define TAILQ_ENTRY(type)						\
-struct {								\
-	struct type *tqe_next;	/* next element */			\
-	struct type **tqe_prev;	/* address of previous next element */	\
-}
-#endif /* !TAILQ_ENTRY */
-
-#ifndef TAILQ_HEAD
-#define _EVENT_DEFINED_TQHEAD
-#define TAILQ_HEAD(name, type)			\
-struct name {					\
-	struct type *tqh_first;			\
-	struct type **tqh_last;			\
-}
-#endif
 struct event {
 	TAILQ_ENTRY(event) ev_active_next;
 	TAILQ_ENTRY(event) ev_next;

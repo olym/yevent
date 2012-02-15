@@ -147,6 +147,7 @@ event_base_priority_init(struct event_base *base, int npriorities)
 static inline void
 event_persist_closure(struct event_base *base, struct event *ev)
 {
+    printf("%s\n", __func__);
     thread_posix_unlock(base->th_base_lock, 0);
     if (ev->ev_events & EV_SIGNAL) {
         read_signalfd(ev->ev_fd);
@@ -169,6 +170,7 @@ static int
 event_process_active_single_queue(struct event_base *base,
     struct event_list *activeq)
 {
+    printf("%s\n", __func__);
     struct event *ev;
     int count = 0;
     assert(activeq != NULL);
@@ -210,7 +212,6 @@ event_process_active_single_queue(struct event_base *base,
 static int
 event_process_active(struct event_base *base)
 {
-    printf("%s\n", __func__);
     struct event_list *activeq = NULL;
     int i, c = 0;
 
@@ -296,7 +297,7 @@ event_base_dispatch(struct event_base *base)
 			retval = -1;
 			goto done;
 		}
-
+        printf("%s: n_active = %d\n", __func__, N_ACTIVE_CALLBACKS(base));
 		if (N_ACTIVE_CALLBACKS(base)) {
 			int n = event_process_active(base);
         } else {
@@ -417,8 +418,8 @@ event_add_internal(struct event *ev, const struct timeval *tv,
         }
     }
 
-    if (res != -1 && wakeup && EVBASE_NEED_NOTIFY(base))
-        evthread_notify_base(base);
+    //if (res != -1 && wakeup && EVBASE_NEED_NOTIFY(base))
+    //    evthread_notify_base(base);
 
     return res;
 }
@@ -508,7 +509,7 @@ static void
 notify_base_cbq_callback(struct deferred_cb_queue *cb, void *baseptr)
 {
 	struct event_base *base = baseptr;
-    printf("base->th_own_id = %d tid = %d runting = %d\n", base->th_owner_id, tid(), base->running_loop);
+    printf("base->th_own_id = %ld tid = %d runting = %d\n", base->th_owner_id, tid(), base->running_loop);
 	if (EVBASE_NEED_NOTIFY(base)) {
         printf("%s\n", __func__);
 		evthread_notify_base(base);
@@ -662,16 +663,15 @@ evthread_notify_read(int fd, short what, void *args)
 static int
 evthread_notify_base(struct event_base *base)
 {
-    printf("%s: tid = %ld\n", __func__, base->th_owner_id);
-  uint64_t one = 1;
-  //if the base already has a pending notify, we don't need to write any more
-  if (!base->is_notify_pending) {
-      base->is_notify_pending = 1;
-      ssize_t n = write(base->notifyfd, &one, sizeof one);
-      if (n != sizeof one) {
-          fprintf(stderr, "%s:write %d bytes instead of 8", __func__, n);
-      }
-  }
+    uint64_t one = 1;
+    //if the base already has a pending notify, we don't need to write any more
+    if (!base->is_notify_pending) {
+        base->is_notify_pending = 1;
+        ssize_t n = write(base->notifyfd, &one, sizeof one);
+        if (n != sizeof one) {
+            fprintf(stderr, "%s:write %d bytes instead of 8", __func__, n);
+        }
+    }
 }
 int
 evthread_make_base_notifiable(struct event_base *base)
