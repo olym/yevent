@@ -312,6 +312,25 @@ done:
     return retval;
 }
 
+int
+event_base_loopbreak(struct event_base *event_base)
+{
+    int r = 0;
+	if (event_base == NULL)
+		return (-1);
+
+	thread_posix_lock(event_base->th_base_lock, 0);
+	event_base->event_break = 1;
+
+	if (EVBASE_NEED_NOTIFY(event_base)) {
+		r = evthread_notify_base(event_base);
+	} else {
+		r = (0);
+	}
+	thread_posix_unlock(event_base->th_base_lock, 0);
+	return r;
+}
+
 /* Returns true iff we're currently watching any events. */
 static int
 event_haveevents(struct event_base *base)

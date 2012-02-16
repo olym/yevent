@@ -53,6 +53,8 @@ struct event_base *event_base_new(void);
  */
 int event_base_dispatch(struct event_base *);
 
+int
+event_base_loopbreak(struct event_base *event_base);
 /**
   Deallocate all memory associated with an event_base, and free the base.
 
