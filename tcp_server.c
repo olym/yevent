@@ -15,51 +15,173 @@
  *
  * =====================================================================================
  */
+typedef void (*tcp_callback)(void *conn);
 
 struct tcp_server
 {
-    struct event_base *base;
-    int thread_num;
+    struct event_base *main_base;
     struct event_base_thread_pool *thread_pool;
     struct connection **conns;
+    int thread_num;
     int started;
+    int listenfd;
+    char* server_ip;
+    short point;
+    int curr_conns;
+    int maxconns;
 };
 
 struct tcp_server *
-tcp_server_init(int thread_num)
+tcp_server_init(struct event_base *base, const char* server_ip, short point, int thread_num)
 {
+    struct tcp_server *server;
+
+    server = malloc(sizeof(struct tcp_server));
+    if (!server) {
+        fprintf(stderr, "%s: malloc error\n", __func__);
+        return NULL
+    }
+
+    server->main_base = base;
     server->thread_num = thread_num;
     server->thread_pool = NULL;
-    int started = 0;
+    server->server_ip = strdup(server_ip);
+    server->point = point;
+    server->started = 0;
+    server->curr_conns = 0;
+    server->maxconns = 1024;
+
+    return server;
 }
 
 void tcp_server_start(struct tcp_server *server)
 {
+    struct event ev;
     if (!server->started) {
         started = 1;
         thread_pool = event_base_thread_pool_init(server->thread_num);        
     }
+    
+    server->linstenfd = server_socket(server->server_ip, server->point);
+    if (sfd != -1) {
+        fprintf(stderr, "%s:server_socket error\n");
+        exit(-1);
+    }
 
-    //设置监听
+    event_assign(&ev, server->main_base, server->listenfd, EV_READ | PERSIST, tcp_handle_accept, server);
+    event_add(&ev, NULL);
 }
 
-void new_connection()
+static void tcp_handle_accept(const int fd, const short which, void *args)
+{
+    struct tcp_server *server = args;
+    struct sockaddr_in addr;
+    struct connection *conn;
+    int addrlen;
+    int sfd;
+    int flags;
+
+    addrlen = sizeof(addr);
+    if ((sfd = accept(server->listenfd, (struct sockaddr *)&addr, &addrlen)) == -1) {
+        perror("accept");
+        exit(1);
+    }
+    if ((flags = fcntl(sfd, F_GETFL, 0)) < 0 ||
+            fcntl(sfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        perror("setting O_NONBLOCK");
+        close(sfd);
+        break;
+    }
+
+    if (server->curr_cons < server->maxconns) 
+        new_connection(server, fd);
+    else {
+        str = "ERROR Too many open connections\r\n";
+        res = write(sfd, str, strlen(str));
+        close(sfd);
+    }
+}
+
+struct void new_connection(struct tcp_server *server, const int fd)
 {
     struct event_base *io_base;
     struct connection *conn;
     io_base = get_next_base(server->thread_pool);
     conn = connection_init(io_base, sockfd, local_addr, peer_addr);
+
+    server->conns[fd] = conn;
     //set conn callback;
 
     //put the connection_established function to the defer queue ，
     //connection_established func notify the conn's thread base to listen conn's io
+    //
+    struct deferred_cb cb;
+    event_deferred_cb_init(&cb, connect_established, conn);
+    event_deferred_cb_schedule();
+    return conn;
 }
 
 void remove_connection()
 {
 
 }
+int server_socket(const char *interface, short point)
+{
+    struct addrinfo *ai;
+    struct addrinfo *next;
+    struct addrinfo hints = { .ai_flags = AI_PASSIVE, 
+                              .ai_family = AF_UNSPEC};
 
+    char point_buf[32];
+    int error;
+    int sfd = -1;
+    int flags = 1;
+
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = 0;
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+
+    snprintf(point_buf, sizeof point_buf, "%d", point);
+    error = getaddrinfo(NULL, point_buf, &hints, &ai);
+    if (error != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(error));
+        return -1;
+    } 
+    for (next = ai; next; next = next->ai_next) {
+        if ((sfd = new_socket(next)) == -1) {
+            fprintf(stderr, "%s: create socket error\n");
+            continue;
+        }
+
+        setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (void *)&flags, sizeof(flags));
+        error = setsockopt(sfd, SOL_SOCKET, SO_KEEPALIVE, (void *)&flags, sizeof(flags));
+        if (error != 0)
+            perror("setsockopt");
+
+        error = setsockopt(sfd, SOL_SOCKET, SO_LINGER, (void *)&ling, sizeof(ling));
+        if (error != 0)
+            perror("setsockopt");
+
+        error = setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags));
+        if (error != 0)
+            perror("setsockopt");
+
+        if (bind(sfd, next->ai_addr, next->ai_addrlen) == -1) {
+            continue;
+        } else {
+            if (listen(sfd, 1024) == -1) {
+                perror("listen()");
+                close(sfd);
+                return -1;
+            }
+            break;
+            //continue;
+        }
+    }
+
+    return sfd;
+}
 static int new_socket(struct addrinfo *ai) {
     int sfd;
     int flags;
@@ -77,3 +199,7 @@ static int new_socket(struct addrinfo *ai) {
     return sfd;
 }
 
+void tcp_handle_accept()
+{
+
+}
