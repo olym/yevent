@@ -15,7 +15,13 @@
  *
  * =====================================================================================
  */
-typedef void (*tcp_callback)(void *conn);
+
+#include <stdio.h>
+#include "tcp_connection.h"
+#include "tcp_server.h"
+
+typedef void (*tcp_conn_callback)(void *conn);
+typedef void (*tcp_msg_callback)(void *conn, struct buffer *buf);
 
 struct tcp_server
 {
@@ -23,7 +29,7 @@ struct tcp_server
     struct event_base_thread_pool *thread_pool;
     struct connection **conns;
     tcp_callback connect_callback;
-    tcp_callback message_callback;
+    tcp_msg_callback message_callback;
     tcp_callback write_complete_callback;
     int thread_num;
     int started;
@@ -53,18 +59,20 @@ tcp_server_init(struct event_base *base, const char* server_ip, short point, int
     server->started = 0;
     server->curr_conns = 0;
     server->maxconns = 1024;
-    server->connection_callback = default_connect_callback;
+    server->connect_callback = default_connect_callback;
     server->message_callback = default_message_callback;
     server->write_complete_callback = default_write_complete_callback;
 
     return server;
 }
 
-void
-tcp_set_callback(struct tcp_server *server, tcp_callback *msg_cb, tcp_callback *write_cb)
-{
+#define tcp_set_tcpect_cb(tcp, tcp_cb) \
+    set_connect_cb(tcp, tcp_cb)
+#define tcp_set_message_cb(tcp, msg_cb) \
+    set_message_cb(tcp, msg_cb)
+#define tcp_set_write_complete_cb(tcp, write_cb) \
+    set_write_complete_cb(tcp, write_cb)
 
-}
 void tcp_server_start(struct tcp_server *server)
 {
     struct event ev;
@@ -104,7 +112,7 @@ static void tcp_handle_accept(const int fd, const short which, void *args)
         break;
     }
 
-    if (server->curr_cons < server->maxconns) 
+    if (server->curr_cons++ < server->maxconns) 
         new_connection(server, fd);
     else {
         str = "ERROR Too many open connections\r\n";
@@ -121,14 +129,14 @@ struct void new_connection(struct tcp_server *server, const int fd)
     conn = connection_init(io_base, sockfd, local_addr, peer_addr);
 
     server->conns[fd] = conn;
-    //TODO set conn callback;
+    //set conn callback;
+    conn_set_connect_cb(conn, server->connect_callback);
+    conn_set_message_cb(conn, server->message_callback);
+    conn_set_write_complete_cb(conn, server->write_complete_callback);
 
     //put the connection_established function to the defer queue ，
     //connection_established func notify the conn's thread base to listen conn's io
-    //
-    struct deferred_cb cb;
-    event_deferred_cb_init(&cb, connect_established, conn);
-    event_deferred_cb_schedule(io_base->defer_queue, &cb);
+    event_run_in_loop(io_base, connect_established, conn);
     return conn;
 }
 
@@ -136,6 +144,7 @@ void remove_connection()
 {
 
 }
+
 int server_socket(const char *interface, short point)
 {
     struct addrinfo *ai;
@@ -210,7 +219,3 @@ static int new_socket(struct addrinfo *ai) {
     return sfd;
 }
 
-void tcp_handle_accept()
-{
-
-}

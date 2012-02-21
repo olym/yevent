@@ -535,6 +535,14 @@ notify_base_cbq_callback(struct deferred_cb_queue *cb, void *baseptr)
     }
 }
 
+void 
+event_run_inloop(struct event_base *base, deferred_cb_fn fn, void *arg)
+{
+    struct deferred_cb cb;
+    event_deferred_cb_init(&cb, connect_established, conn);
+    event_deferred_cb_schedule(io_base->defer_queue, &cb);
+}
+
 void
 event_deferred_cb_init(struct deferred_cb *cb, deferred_cb_fn fn, void *arg)
 {
