@@ -21,8 +21,31 @@ struct connection
     struct event_base *base;
     struct event *ev;
     int fd;
-    struct sockaddr_in local_sock;
-    struct sockaddr_in peer_sock;
     struct buffer *input_buffer;
     struct buffer *output_buffer;
 };
+
+struct connection *
+connection_init()
+{
+
+}
+
+void handle_read(void *args)
+{
+
+}
+void handle_write(void *args)
+{
+
+}
+
+void connect_established()
+{
+
+}
+
+void connect_send(struct connecttion *conn, void *data, int len)
+{
+
+}

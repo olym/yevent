@@ -56,7 +56,7 @@ void thread_start(struct thread* thd);
 void thread_join(struct thread* thd);
 
 void * thread_posix_lock_alloc(unsigned locktype);
-void thread_posix_lock_free(void *_lock, unsigned locktype);
+void thread_posix_lock_free(void *_lock);
 void thread_posix_lock(void *_lock, unsigned mode);
 void thread_posix_unlock(void *_lock, unsigned mode);
 unsigned long thread_posix_get_id(void);

@@ -86,7 +86,7 @@ event_base_thread_stop(struct event_base_thread *base_thread)
     thread_join(base_thread->thread);
     thread_posix_lock_free(base_thread->lock);
     thread_posix_cond_free(base_thread->cond);
-    event_free(base_loop);
+    event_base_free(base_loop);
 }
 
 
@@ -113,10 +113,10 @@ struct event_base_thread_pool *event_base_thread_pool_init(int num_thread)
     }
 
     for (i = 0; i < num_thread; i++) {
-        base_threads[i] = event_base_thread_init();
-        if (base_threads[i] == NULL)
+        pool->base_threads[i] = event_base_thread_init();
+        if (pool->base_threads[i] == NULL)
            return NULL; 
-        bases[i] = base_thread[i]->base;
+        pool->bases[i] = pool->base_threads[i]->base;
     }
     pool->cur_num = 0;
     pool->num_thread = num_thread;
@@ -128,8 +128,7 @@ struct event_base* get_next_base(struct event_base_thread_pool *pool)
 {
     struct event_base *base;
 
-    base = pool->bases[i];
-    pool->cur_num++;
+    base = pool->bases[pool->cur_num++];
     if (pool->cur_num > pool->num_thread)
         pool->cur_num = 0;
 

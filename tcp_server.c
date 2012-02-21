@@ -22,6 +22,9 @@ struct tcp_server
     struct event_base *main_base;
     struct event_base_thread_pool *thread_pool;
     struct connection **conns;
+    tcp_callback connect_callback;
+    tcp_callback message_callback;
+    tcp_callback write_complete_callback;
     int thread_num;
     int started;
     int listenfd;
@@ -50,10 +53,18 @@ tcp_server_init(struct event_base *base, const char* server_ip, short point, int
     server->started = 0;
     server->curr_conns = 0;
     server->maxconns = 1024;
+    server->connection_callback = default_connect_callback;
+    server->message_callback = default_message_callback;
+    server->write_complete_callback = default_write_complete_callback;
 
     return server;
 }
 
+void
+tcp_set_callback(struct tcp_server *server, tcp_callback *msg_cb, tcp_callback *write_cb)
+{
+
+}
 void tcp_server_start(struct tcp_server *server)
 {
     struct event ev;
@@ -110,14 +121,14 @@ struct void new_connection(struct tcp_server *server, const int fd)
     conn = connection_init(io_base, sockfd, local_addr, peer_addr);
 
     server->conns[fd] = conn;
-    //set conn callback;
+    //TODO set conn callback;
 
     //put the connection_established function to the defer queue ，
     //connection_established func notify the conn's thread base to listen conn's io
     //
     struct deferred_cb cb;
     event_deferred_cb_init(&cb, connect_established, conn);
-    event_deferred_cb_schedule();
+    event_deferred_cb_schedule(io_base->defer_queue, &cb);
     return conn;
 }
 

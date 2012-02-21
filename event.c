@@ -243,7 +243,7 @@ event_process_deferred_active(struct deferred_cb_queue *queue, int *breakptr)
 		--queue->active_count;
 		UNLOCK_DEFERRED_QUEUE(queue);
 
-		cb->cb(cb, cb->arg);
+		cb->cb(cb->arg);
 
 		LOCK_DEFERRED_QUEUE(queue);
 		if (*breakptr)

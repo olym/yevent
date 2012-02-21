@@ -90,7 +90,7 @@ thread_posix_lock_alloc(unsigned locktype)
 }
 
 void
-thread_posix_lock_free(void *_lock, unsigned locktype)
+thread_posix_lock_free(void *_lock)
 {
     pthread_mutex_t *lock = _lock;
     pthread_mutex_destroy(lock);

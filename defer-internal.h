@@ -19,7 +19,8 @@
 #define _DEFER_INTERNAL_H
 
 struct deferred_cb;
-typedef void (*deferred_cb_fn)(struct deferred_cb *, void *);
+struct event_base;
+typedef void (*deferred_cb_fn)(void *);
 /** A deferred_cb is a callback that can be scheduled to run as part of
  * an event_base's event_loop, rather than running immediately. */
 struct deferred_cb {
