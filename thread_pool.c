@@ -101,7 +101,7 @@ thread_pool_run(struct thread_pool *pool, task_cb_fn task_cb, void* args)
             return -1;
         } 
         task->task_cb = task_cb;
-        task->args = strdup(args);
+        task->args = args;
         TAILQ_INSERT_TAIL(&pool->taskqueue, task, task_next);
 
         // signal the thread to run the task;
@@ -136,8 +136,10 @@ _thread_pool_wait_run(void* args)
     printf("%s:thread %d\n", __func__, tid());
     while(pool->running) {
         struct task *task = _thread_pool_take(pool);
-        if (task)
+        if (task) {
             task->task_cb(task->args);
+            free(task);
+        }
     }
     return NULL;
 }

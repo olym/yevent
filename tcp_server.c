@@ -28,6 +28,7 @@ struct tcp_server
     struct event_base *main_base;
     struct event_base_thread_pool *thread_pool;
     struct connection **conns;
+    struct event listen_ev;
     tcp_callback connect_callback;
     tcp_msg_callback message_callback;
     tcp_callback write_complete_callback;
@@ -75,7 +76,6 @@ tcp_server_init(struct event_base *base, const char* server_ip, short point, int
 
 void tcp_server_start(struct tcp_server *server)
 {
-    struct event ev;
     if (!server->started) {
         started = 1;
         thread_pool = event_base_thread_pool_init(server->thread_num);        
@@ -87,8 +87,8 @@ void tcp_server_start(struct tcp_server *server)
         exit(-1);
     }
 
-    event_assign(&ev, server->main_base, server->listenfd, EV_READ | PERSIST, tcp_handle_accept, server);
-    event_add(&ev, NULL);
+    event_assign(&server->listen_ev, server->main_base, server->listenfd, EV_READ | PERSIST, tcp_handle_accept, server);
+    event_add(&server->listen_ev, NULL);
 }
 
 static void tcp_handle_accept(const int fd, const short which, void *args)

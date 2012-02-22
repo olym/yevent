@@ -536,11 +536,15 @@ notify_base_cbq_callback(struct deferred_cb_queue *cb, void *baseptr)
 }
 
 void 
-event_run_inloop(struct event_base *base, deferred_cb_fn fn, void *arg)
+event_run_inloop(struct event_base *base, struct deferred_cb *cb, defered_cb_fn fn, void *arg)
 {
-    struct deferred_cb cb;
-    event_deferred_cb_init(&cb, connect_established, conn);
-    event_deferred_cb_schedule(io_base->defer_queue, &cb);
+    if (EVBASE_IS_IN_LOOP_THREAD(base)) {
+        cb->cb(cb->args);
+    } else {
+        cb->cb = fn;
+        cb->arg = arg;
+        event_deferred_cb_schedule(base->defer_queue, cb);
+    }
 }
 
 void
