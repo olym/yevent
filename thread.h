@@ -38,6 +38,8 @@
 #define EVBASE_NEED_NOTIFY(base)			 \
 	((base)->running_loop &&			 \
 	    ((base)->th_owner_id != tid()))
+#define EVBASE_IS_IN_LOOP_THREAD(base) \
+    ((base)->th_owner_id == tid())
 
 typedef void* (*thread_cb_fn)(void *);
 
