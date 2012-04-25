@@ -24,11 +24,9 @@ public:
     runAt();
     runEvery();
     runAfter();
-    cancelTimer(int timerId);
-    unregisterEvent();
+    deleteTimer(int timerId);
     registerSignalEvent();
-    registerTimerEvent();
-    registerEvent();
+    unregisterSignalEvent();
     dispatch();
 
 private:
@@ -36,7 +34,8 @@ private:
     bool stop_;
     int notifyfd_; //notify dispatch wake up
     boost::scoped_ptr<Mutiplexer> mutiplexer_;
-    boost::scoped_ptr<MinHeap> minHeap_;
+    boost::scoped_ptr<TimerManager> timerManager_;
+    boost::scoped_ptr<SignalManager> SignalManager_;
     Event notifyEvent_;
     std::vector<Event> registeredEvents_(YE_MINEVENT);
     std::vector<FiredEvent> fired_(YE_MINEVENT);
