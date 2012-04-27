@@ -23,7 +23,7 @@ namespace yevent
     class SignalEvent : public Event
     {
         public:
-            SignalEvent(int signo) : Event(signalfd_create(signo), EV_READ) {}
+            SignalEvent(EventLoop *loop, int signo) : Event(loop, signalfd_create(signo), EV_READ) {}
             virtual ~SignalEvent(){}
             virtual handleEvent();
         private:
