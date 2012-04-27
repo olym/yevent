@@ -25,7 +25,18 @@ struct FireEvent
 
 class Event
 {
+    public:
+        Event(EventLoop *loop, int fd, int event);
+        int getEvent();
+        void setReadCallback();
+        void setWriteCallback();
     private:
-
+        int fd_;
+        int event_; //EV_READ; EV_WRITE;
+        EventLoop *pLoop_;
+        EventCallBack readCallback_;
+        EventCallBack writeCallback_;
+        void *evArgs_;
 }
+
 #endif/* __EVENT_H */
