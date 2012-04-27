@@ -15,4 +15,13 @@
  *
  * =====================================================================================
  */
+using namespace yevent;
 
+EventLoop::registerSignalEvent(int signal, EventCallback cb, void *arg)
+{
+    int sfd = signalfd_create(signal);
+    Event *ev = new Event(sfd, EV_READ);
+    ev->setReadCallback(cb, arg);
+    
+    registerEvent(ev);
+}

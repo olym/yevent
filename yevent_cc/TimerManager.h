@@ -15,4 +15,17 @@
  *
  * =====================================================================================
  */
-
+#ifndef __TIMER_MANAGER_H
+#define __TIMER_MANAGER_H
+namespace yevent
+{
+class TimerEvent : public Event
+{
+    public:
+        TimerEvent(int fd){}
+        virtual void handleEvent();
+    private:
+        const double timeout_;
+};
+}
+#endif
