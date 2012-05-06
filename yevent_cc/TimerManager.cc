@@ -40,3 +40,15 @@ virtual void TimerEvent::handleEvent()
     else
         m_pLoop_->deleteTimerEvent();
 }
+
+int CreateTimerfd()
+{
+    int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
+
+    if (timerfd < 0) {
+        fprintf(stderr, "failed in timerfd_create\n");
+        return -1;
+    }
+
+    return timerfd;
+}

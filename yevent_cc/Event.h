@@ -27,10 +27,12 @@ class Event
 {
     public:
         Event(EventLoop *loop, int fd, int event);
-        int getEvent();
-        void setReadCallback();
-        void setWriteCallback();
-    private:
+        virtual ~Event();
+        virtual int getEvent();
+        virtual void setReadCallback();
+        virtual void setWriteCallback();
+        virtual void handleEvent();
+    //private:
         int fd_;
         int event_; //EV_READ; EV_WRITE;
         EventLoop *pLoop_;
