@@ -25,7 +25,7 @@ namespace yevent
         public:
             SignalEvent(EventLoop *loop, int signo) : Event(loop, signalfd_create(signo), EV_READ) {}
             virtual ~SignalEvent(){}
-            virtual handleEvent();
+            virtual void handleEvent();
         private:
             SignalEvent();
             int signo_;

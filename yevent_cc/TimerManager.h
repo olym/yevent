@@ -19,6 +19,8 @@
 #define __TIMER_MANAGER_H
 namespace yevent
 {
+class Timestamp;
+
 class TimerEvent : public Event
 {
 public:
@@ -45,16 +47,17 @@ class TimerManager : public Event
     public:
         TimerManager(EventLoop *loop):Event(loop, CreateTimerfd(), EV_READ), currentTimerId_(-1), minHeap(new MinHeap) {}
         long deleteTimer(long timerId);
-        //从最小堆中获取最小时间
+        //从最小堆中获取最小时间的timer
         TimerEvent* getNearestTimer();
-        //生成timer, 并将该timer添加到最小堆中和map<id, timer>中, 并更新fd_
-        long addTimer(double expired, double interval, TimerCallback cb, void *args);
+        //生成timer, 并将该timer添加到最小堆中, 并将最小timer放到loop循环中。
+        //return: timer id
+        long addTimer(Timestamp when, double interval, TimerCallback cb, void *args);
         //重新调整MinHeap
         void reAddTimer(long timerId); 
 
         Timer *getTimer(long timerId);
     private:
-        void (TimerEvent *event);
+        void resetTimerfd(TimerEvent *event);
 
         static const int RepeatTimer = 1;
         static const int OnceTimer = 2;
