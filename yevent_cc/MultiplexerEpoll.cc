@@ -67,8 +67,6 @@ int MultiplexerEpoll::deleteEvent(int fd, int delmask)
     ee.events = 0;
     ee.data.fd = fd;
     ee.data.u64 = 0;
-    /* Note, Kernel < 2.6.9 requires a non null event pointer even for
-     * EPOLL_CTL_DEL. */
     if (epoll_ctl(m_epollfd, EPOLL_CTL_DEL, fd, &ee) == -1
             && errno != ENOENT && errno != EBADF) {
         fprintf(stderr, "epoll_ctl(%d,%d) failed: %d\n", EPOLL_CTL_DEL,fd,errno);

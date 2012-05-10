@@ -34,7 +34,6 @@ public:
     virtual ~TimerEvent(){}
 
     virtual void handleEvent();
-    virtual void setReadCallback();
     void setTimerId(int id);
 private:
     long id_;
@@ -45,7 +44,7 @@ private:
 class TimerManager : public Event
 {
     public:
-        TimerManager(EventLoop *loop):Event(loop, CreateTimerfd(), EV_READ), currentTimerId_(-1), minHeap(new MinHeap) {}
+        TimerManager(EventLoop *loop):Event(loop, CreateTimerfd(), EV_READ), currentTimerId_(-1), minHeap_(new MinHeap) {}
         long deleteTimer(long timerId);
         //从最小堆中获取最小时间的timer
         TimerEvent* getNearestTimer();
