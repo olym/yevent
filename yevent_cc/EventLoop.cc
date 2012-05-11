@@ -22,7 +22,7 @@ EventLoop::EventLoop()
     notifyfd_(createEventfd()),
     notifyEvent_(new Event(this, notifyfd_, EV_READ)),
     mutiplexer_(NewMultiplexerImp(Multiplexer_EPOLL)),
-    timerManager_(new TimerEvent_),
+    timerManager_(new TimerManager(this)),
     threadId_(Thread::tid());
 {
     notifyEvent_->setReadCallback(EventCallback cb, NULL);
@@ -31,17 +31,28 @@ EventLoop::EventLoop()
 
 void EventLoop::registerEvent(Event *event)
 {
-    if (registeredEvents_.find(event->fd_) == registeredEvents_.end()) {
-        if (mutiplexer_->addEvent(event->fd_, event->event_) != -1)
-            registeredEvents_[event->fd_] = event;
+    if (registeredEvents_.find(event->getFd()) == registeredEvents_.end()) {
+        if (mutiplexer_->addEvent(event->getFd(), event->getEvent()) != -1)
+            registeredEvents_[event->getFd()] = event;
     } else {
         updateEvent(event);
     }
 
 }
+void EventLoop::unregisterEvent(Event *ev)
+{
+    if (registeredEvents_.find(ev->getFd()) != registeredEvents_.end()) {
+        deleteEvent(ev);
+        registeredEvents_.erase(ev->getFd());
+    }
+}
 void EventLoop::updateEvent(Event *event)
 {
-    mutiplexer_->updateEvent(event->fd, event->event_);
+    mutiplexer_->updateEvent(event->getFd(), event->getEvent());
+}
+void EventLoop::deleteEvent(Event *event)
+{
+    mutiplexer_->deleteEvent(event->getFd(), event->getEvent());
 }
 
 void EventLoop::dispatch()
@@ -58,28 +69,41 @@ void EventLoop::dispatch()
         for (std::vector<Event *>::iterator it = activeEvents_.begin();
                 it != activeEvents_.end(); ++iterator) {
             (*it)->handleEvent();
-            //Event *ev = *it;
-            //int rfired = 0;
-
-            //if (ev->mask & EV_READ) {
-            //    rfired = 1;
-            //    ev->readCallback(this, fd, ev->privdata);
-            //}
-            //if (ev->mask & EV_WRITE) {
-            //    if (!rfired || ev->wfileProc != ev->rfileProc)
-            //        ev->writeCallback(this, fd, ev->privdata);
-            //}
         }
         runPendingFunctors();
     } 
 }
 
-EventLoop::registerSignalEvent(int signo, EventCallback cb, void *arg)
+Event* EventLoop::registerSignalEvent(int signo, EventCallback cb, void *arg)
 {
     Event *ev = new SignalEvent(this, signo, EV_READ);
     ev->setReadCallback(cb, arg);
     
     registerEvent(ev);
+
+    return ev;
 }
 
+
+
+
+long EventLoop::runAt(Timestamp &ts, TimerCallback cb, void *arg)
+{
+    return timerManager_->addTimer(ts, 0.0, cb, arg);
+}
+
+long EventLoop::runAfter(double timeout, TimerCallback cb, void *arg)
+{
+    return timerManager_->addTimer(addTime(Timestamp::now(), timeout), 0.0, cb, arg);
+}
+
+long EventLoop::runEvery(double interval, TimerCallback cb, void *arg)
+{
+    return timerManager_->addTimer(addTime(Timestamp::now(), interval), interval, cb, arg);
+}
+
+void EventLoop::deleteTimer(long timerId)
+{
+
+}
 

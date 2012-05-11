@@ -25,12 +25,13 @@ class EventLoop
 {
 public:
     EventLoop();
-    long runAt(long expire, TimerCallback cb, void *privdata);
-    long runEvery(long interval, TimerCallback cb, void *privdata);
-    long runAfter(long delay, TimerCallback cb, void *privdata);
+    long runAt(Timestamp &ts, TimerCallback cb, void *privdata);
+    long runEvery(double interval, TimerCallback cb, void *privdata);
+    long runAfter(double delay, TimerCallback cb, void *privdata);
     void deleteTimer(long timerId);
-    int registerSignalEvent(int signal, SignalCallback cb, void *privdata);
-    void unregisterSignalEvent();
+    void registerEvent(Event *ev)
+    void unregisterEvent(Event *ev); 
+    Event* registerSignalEvent(int signo, SignalCallback cb, void *privdata);
     dispatch();
 
 private:
@@ -42,7 +43,7 @@ private:
     int notifyfd_; //notify dispatch wake up
     Event notifyEvent_;
     boost::scoped_ptr<Mutiplexer> mutiplexer_;
-    boost::scoped_ptr<TimerEvent> timerEvent_;
+    boost::scoped_ptr<TimerManager> timerManager_;
     std::map<int, Event*> registeredEvents_;
     std::vector<Event *> activeEvents_;
     unsigned long threadId_;
