@@ -28,13 +28,16 @@ class Event
     public:
         Event(EventLoop *loop, int fd, int event) : pLoop_(loop), fd_(fd), event_(event);
         virtual ~Event();
-        virtual void setReadCallback(EventCallback cb, void *args) { readCallback_ = cb; evReadArgs_ = args;}
-        virtual void setWriteCallback(EventCallback cb, void *args) { writeCallback_ = cb; evWriteArgs_ = args; }
         virtual void handleEvent() = 0;
-        virtual int getEvent() { return event_;}
-        virtual int getFd() { return fd_; }
-        virtual void *getArgs() { return evArgs_; }
-    //private:
+        void setReadCallback(EventCallback cb, void *args) { readCallback_ = cb; evReadArgs_ = args;}
+        void setWriteCallback(EventCallback cb, void *args) { writeCallback_ = cb; evWriteArgs_ = args; }
+        void update() { pLoop_->updateEvent(this);}
+        void delete() { pLoop_->deleteEvent(this);}
+        int getEvent() { return event_;}
+        int getFd() { return fd_; }
+        EventLoop *getEventLoop() {return pLoop_;}
+        void *getArgs() { return evArgs_; }
+    private:
         int fd_;
         int event_; //EV_READ; EV_WRITE;
         EventLoop *pLoop_;

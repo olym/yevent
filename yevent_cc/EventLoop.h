@@ -33,14 +33,14 @@ public:
     void unregisterEvent(Event *ev); 
     Event* registerSignalEvent(int signo, SignalCallback cb, void *privdata);
     dispatch();
-
-private:
     void updateEvent(Event *event); // register and update
     void deleteEvent(Event *event); // remove event from registeredEvents_, and call mutiplexer_->deleteEvent;
+
+private:
     void handlerNotify();
 
     bool stop_;
-    int notifyfd_; //notify dispatch wake up
+    int notifyfd_; 
     Event notifyEvent_;
     boost::scoped_ptr<Mutiplexer> mutiplexer_;
     boost::scoped_ptr<TimerManager> timerManager_;

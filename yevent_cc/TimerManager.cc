@@ -15,8 +15,23 @@
  *
  * =====================================================================================
  */
+#include <stdio.h>
+#include <stdlib.h>
+#include "TimerManager.h"
 
 using namespace yevent;
+
+int CreateTimerfd()
+{
+    int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
+
+    if (timerfd < 0) {
+        fprintf(stderr, "failed in timerfd_create\n");
+        return -1;
+    }
+
+    return timerfd;
+}
 
 virtual void TimerEvent::handleEvent()
 {
@@ -29,26 +44,58 @@ virtual void TimerEvent::handleEvent()
 
     timer->timerCb();
 
-    if (timer->timerType == TimerEvent::OnceTimer)
-        deleteTimer(currentTimerId_);
-    else
-        reAddTimer(currentTimerId_);
-
-    Timer *timer = getNearestTimer();
-    if (timer != NULL)
-        setTimerfd(timer->when_sec, timer->when_ms);
-    else
-        m_pLoop_->deleteTimerEvent();
 }
 
-int CreateTimerfd()
+//FIXME 
+TimerEvent *TimerManager::getNearestValidTimer()
 {
-    int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
-
-    if (timerfd < 0) {
-        fprintf(stderr, "failed in timerfd_create\n");
-        return -1;
+    TimerEvent *timer = static_cast<TimerEvent *>(minHeap_->top().data);
+    if (timer == NULL)
+        return NULL;
+    while (!timer->isValid()) {
+        minHeap_->pop();
+        timer = static_cast<TimerEvent *>(minHeap_->top().data);
+        if (timer == NULL)
+            return NULL;
     }
 
-    return timerfd;
+    return timer;
+}
+
+long TimerManager::addTimer(Timestamp when, double interval, TimerCallback cb, void *args)
+{
+    TimerEvent *timer = new TimerEvent(pLoop_, timerFd_, when, interval);
+    timer->setReadCallback(cb, args);
+
+    MinHeapEntry *entry = new MinHeapEntry(static_cast<void *>timer);
+    minHeap_->push(entry);
+
+    updateTimer();
+
+}
+void TimerManager::updateTimer()
+{
+    if (getNearestValidTimer())
+        pLoop_->updateEvent(timer);
+}
+//FIXME
+long TimerManager::deleteTimer(TimerEvent *timer)
+{
+    assert(timer);
+
+    if (timer == currentTimer_) {
+        if ( minHeap_->size() != 0) {
+            currentTimer_ == getNearestValidTimer();
+            if (currentTimer_ != NULL)
+                currentTimer_->updateEvent();
+        } esle {
+            currentTimer_->deleteEvent();
+        }
+    } else {
+        for (int i = 0; i < minHeap_->size(); ++i) {
+            if (static_cast<TimerEvent *>(minHeap_[i]->data) == timer ) {
+                timer->setValid(false);
+            }
+        }
+    }
 }
