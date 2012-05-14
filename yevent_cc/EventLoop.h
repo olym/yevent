@@ -18,9 +18,19 @@
 
 #ifndef __EVENTLOOP_H
 #define __EVENTLOOP_H
+#include <boost/scoped_ptr.hpp>
+#include <map>
+#include <vector>
 
 namespace yevent
 {
+typedef void (*TimerCallback)(void *args);
+typedef void (*SignalCallback)(void *args);
+class Event;
+class Timestamp;
+class TimerManager;
+class Mutiplexer;
+
 class EventLoop
 {
 public:
@@ -29,10 +39,10 @@ public:
     long runEvery(double interval, TimerCallback cb, void *privdata);
     long runAfter(double delay, TimerCallback cb, void *privdata);
     void deleteTimer(long timerId);
-    void registerEvent(Event *ev)
+    void registerEvent(Event *ev);
     void unregisterEvent(Event *ev); 
     Event* registerSignalEvent(int signo, SignalCallback cb, void *privdata);
-    dispatch();
+    void dispatch();
     void updateEvent(Event *event); // register and update
     void deleteEvent(Event *event); // remove event from registeredEvents_, and call mutiplexer_->deleteEvent;
 
@@ -41,13 +51,13 @@ private:
 
     bool stop_;
     int notifyfd_; 
-    Event notifyEvent_;
+    //Event notifyEvent_;
     boost::scoped_ptr<Mutiplexer> mutiplexer_;
     boost::scoped_ptr<TimerManager> timerManager_;
     std::map<int, Event*> registeredEvents_;
     std::vector<Event *> activeEvents_;
     unsigned long threadId_;
-    MutexLock mutex_;
+    //MutexLock mutex_;
 };
 }
 

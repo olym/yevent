@@ -50,7 +50,8 @@ typedef void (*ElementDestructor)(void *obj);
         inline void init();
         inline MinHeapEntry *pop();
         inline int push(MinHeapEntry *entry);
-        inline void delete(MinHeapEntry *entry);
+        //MinHeapEntry *operator[](const int index) { return pHeap_[index];}
+        MinHeapEntry *getEntry(const int index) { return pHeap_[index];}
         unsigned size() { return size_;}
         unsigned capacity() { return capacity_;}
         bool empty() {return size_ == 0;}

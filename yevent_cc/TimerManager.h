@@ -17,9 +17,16 @@
  */
 #ifndef __TIMER_MANAGER_H
 #define __TIMER_MANAGER_H
+#include <boost/scoped_ptr.hpp>
+#include "Timestamp.h"
+#include "Event.h"
+#include "MinHeap.h"
 namespace yevent
 {
-class Timestamp;
+int CreateTimerfd();
+
+typedef void (*TimerCallback)(void *args);
+class EventLoop;
 
 class TimerEvent : public Event
 {
@@ -37,14 +44,15 @@ public:
     virtual void handleEvent();
     void setTimerId(int id) {id_ = id;}
     long getTimerId() {return id_;}
-    Timestamp getTimerWhen() {return when_;}
+    Timestamp getWhen() {return when_;}
+    void setWhen(Timestamp when) {when_ = when;}
     bool isRepeat() {return repeat_;}
     double getInterval() {return interval_;}
     void setValid(bool isValid) { isValid_ = isValid;}
-    void isValid() { return isValid_;}
+    bool isValid() { return isValid_;}
 private:
     long id_;
-    Timestamp when_
+    Timestamp when_;
     double interval_;
     bool repeat_;
     bool isValid_;
@@ -53,22 +61,15 @@ private:
 class TimerManager 
 {
     public:
-        TimerManager(EventLoop *loop):timerFd_(CreateTimerfd()), pLoop_(loop), currentTimerId_(0), minHeap_(new MinHeap) {}
+        TimerManager(EventLoop *loop):timerFd_(CreateTimerfd()), pLoop_(loop), currentTimerId_(0), minHeap_(new MinHeap(NULL, NULL)) {}
         void deleteTimer(TimerEvent *timer);
-        //从最小堆中获取最小时间的timer
         TimerEvent* getNearestValidTimer();
-        //生成timer, 并将该timer添加到最小堆中, 并将最小timer放到loop循环中。
-        //return: timer id
         long addTimer(Timestamp when, double interval, TimerCallback cb, void *args);
-        //重新调整MinHeap
-        void reAddTimer(long timerId); 
+        void handleTimerEvents();
 
-        TimerEvent *getCurrentTimer(){return currentTimer_;}
-        void setCurrentTimer(TimerEvent *timer) {currentTimer_ = timer;}
-
-        TimerEvent *getTimer(long timerId);
     private:
         void resetTimerfd(TimerEvent *event);
+        void updateTimerEvent();
 
         static const int RepeatTimer = 1;
         static const int OnceTimer = 2;
@@ -76,10 +77,9 @@ class TimerManager
         EventLoop *pLoop_;
         TimerEvent *currentTimer_;
         long currentTimerId_;
-        boost::shared_ptr<MinHeap> minHeap_;
+        boost::scoped_ptr<MinHeap> minHeap_;
 };
 
-int CreateTimerfd();
 
 }
 #endif

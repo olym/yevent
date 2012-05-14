@@ -17,6 +17,12 @@
  */
 #ifndef __EVENT_H
 #define __EVENT_H
+namespace yevent{
+
+#define EV_READ 0x01
+
+typedef void (*EventCallback)(void *args);
+class EventLoop;
 struct FireEvent 
 {
     int fd;
@@ -26,25 +32,26 @@ struct FireEvent
 class Event
 {
     public:
-        Event(EventLoop *loop, int fd, int event) : pLoop_(loop), fd_(fd), event_(event);
+        Event(EventLoop *loop, int fd, int event) : pLoop_(loop), fd_(fd), event_(event) {}
         virtual ~Event();
-        virtual void handleEvent() = 0;
+        virtual void handleEvent();
         void setReadCallback(EventCallback cb, void *args) { readCallback_ = cb; evReadArgs_ = args;}
         void setWriteCallback(EventCallback cb, void *args) { writeCallback_ = cb; evWriteArgs_ = args; }
-        void update() { pLoop_->updateEvent(this);}
-        void delete() { pLoop_->deleteEvent(this);}
+        void updateEvent() { pLoop_->updateEvent(this);}
+        void deleteEvent() { pLoop_->deleteEvent(this);}
         int getEvent() { return event_;}
         int getFd() { return fd_; }
+        void handleRead() { readCallback_(evReadArgs_);}
+        void handleWrite() { writeCallback_(evWriteArgs_);}
         EventLoop *getEventLoop() {return pLoop_;}
-        void *getArgs() { return evArgs_; }
     private:
         int fd_;
         int event_; //EV_READ; EV_WRITE;
         EventLoop *pLoop_;
-        EventCallBack readCallback_;
-        EventCallBack writeCallback_;
+        EventCallback readCallback_;
+        EventCallback writeCallback_;
         void *evReadArgs_;
         void *evWriteArgs_;
+};
 }
-
 #endif/* __EVENT_H */

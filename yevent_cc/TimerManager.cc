@@ -17,7 +17,12 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/timerfd.h>
+#include "EventLoop.h"
+#include "Event.h"
 #include "TimerManager.h"
+#include "MinHeap.h"
+#include "Timestamp.h"
 
 using namespace yevent;
 
@@ -33,28 +38,45 @@ int CreateTimerfd()
     return timerfd;
 }
 
-virtual void TimerEvent::handleEvent()
+void TimerEvent::handleEvent()
 {
     uint64_t exp;
-    int s = ::read(signalfd, &exp, sizeof(uint64_t));
+    int s = ::read(getFd(), &exp, sizeof(uint64_t));
     if (s != sizeof(uint64_t))
         fprintf(stderr, "%s: read error \n", __func__);
 
-    Timer *timer = getTimer(currentTimerId_);
-
-    timer->timerCb();
-
+    //readCallback_(evReadArgs_);
 }
 
-//FIXME 
+void TimerManager::handleTimerEvents()
+{
+    TimerEvent *timer = getNearestValidTimer();
+    while (timer->getWhen() < Timestamp::now()) {
+        timer->handleRead();
+        if (timer->isRepeat()) {
+            MinHeapEntry *entry = minHeap_->pop();
+            timer->setWhen(addTime(timer->getWhen(), timer->getInterval()));
+            minHeap_->push(entry);
+        } else {
+            delete minHeap_->pop();
+            delete timer;
+        }
+        timer = getNearestValidTimer();
+    }
+
+    updateTimerEvent();
+}
+
 TimerEvent *TimerManager::getNearestValidTimer()
 {
-    TimerEvent *timer = static_cast<TimerEvent *>(minHeap_->top().data);
+    TimerEvent *timer = static_cast<TimerEvent *>(minHeap_->top()->data);
     if (timer == NULL)
         return NULL;
     while (!timer->isValid()) {
-        minHeap_->pop();
-        timer = static_cast<TimerEvent *>(minHeap_->top().data);
+        delete minHeap_->pop();
+        delete timer;
+
+        timer = static_cast<TimerEvent *>(minHeap_->top()->data);
         if (timer == NULL)
             return NULL;
     }
@@ -67,35 +89,26 @@ long TimerManager::addTimer(Timestamp when, double interval, TimerCallback cb, v
     TimerEvent *timer = new TimerEvent(pLoop_, timerFd_, when, interval);
     timer->setReadCallback(cb, args);
 
-    MinHeapEntry *entry = new MinHeapEntry(static_cast<void *>timer);
+    MinHeapEntry *entry = new MinHeapEntry(static_cast<void *>(timer));
     minHeap_->push(entry);
 
-    updateTimer();
+    updateTimerEvent();
 
 }
-void TimerManager::updateTimer()
+void TimerManager::updateTimerEvent()
 {
-    if (getNearestValidTimer())
+    TimerEvent *timer;
+    if (timer = getNearestValidTimer())
         pLoop_->updateEvent(timer);
 }
-//FIXME
-long TimerManager::deleteTimer(TimerEvent *timer)
+void TimerManager::deleteTimer(TimerEvent *timer)
 {
     assert(timer);
 
-    if (timer == currentTimer_) {
-        if ( minHeap_->size() != 0) {
-            currentTimer_ == getNearestValidTimer();
-            if (currentTimer_ != NULL)
-                currentTimer_->updateEvent();
-        } esle {
-            currentTimer_->deleteEvent();
-        }
-    } else {
-        for (int i = 0; i < minHeap_->size(); ++i) {
-            if (static_cast<TimerEvent *>(minHeap_[i]->data) == timer ) {
-                timer->setValid(false);
-            }
+    for (int i = 0; i < minHeap_->size(); ++i) {
+        if (static_cast<TimerEvent *>(minHeap_->getEntry(i)->data) == timer ) {
+            timer->setValid(false);
+            updateTimerEvent();
         }
     }
 }

@@ -70,6 +70,7 @@ void EventLoop::dispatch()
                 it != activeEvents_.end(); ++iterator) {
             (*it)->handleEvent();
         }
+        timerManager_->handleExpiredTimer();
         runPendingFunctors();
     } 
 }
