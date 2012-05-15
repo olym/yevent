@@ -31,7 +31,6 @@
 #include "epoll.h"
 #include "eventfd.h"
 
-/* Prototypes */
 static inline int event_add_internal(struct event *ev,
     const struct timeval *tv, int tv_is_absolute);
 static inline int event_del_internal(struct event *ev);
@@ -76,7 +75,7 @@ event_base_new()
     //support thread
     base->th_base_lock = thread_posix_lock_alloc(0);
     base->defer_queue.lock = base->th_base_lock;
-	/* prepare an event that we can use for wakeup */
+
     r = evthread_make_base_notifiable(base);
     if (r<0) {
         event_base_free(base);
@@ -84,7 +83,6 @@ event_base_new()
     }
 
 
-	/* allocate a single active event queue */
 	if (event_base_priority_init(base, 1) < 0) {
 		event_base_free(base);
 		return NULL;
@@ -159,13 +157,7 @@ event_persist_closure(struct event_base *base, struct event *ev)
 	(*ev->ev_callback)((int)ev->ev_fd, ev->ev_res, ev->ev_arg);
 }
 
-/*
-  Helper for event_process_active to process all the events in a single queue,
-  releasing the lock as we go.  This function requires that the lock be held
-  when it's invoked.  Returns -1 if we get a signal or an event_break that
-  means we should stop processing any active events now.  Otherwise returns
-  the number of non-internal events that we processed.
-*/
+
 static int
 event_process_active_single_queue(struct event_base *base,
     struct event_list *activeq)
@@ -204,11 +196,7 @@ event_process_active_single_queue(struct event_base *base,
     return count;
 }
 
-/*
- * Active events are stored in priority queues.  Lower priorities are always
- * process before higher priorities.  Low priority events can starve high
- * priority ones.
- */
+
 static int
 event_process_active(struct event_base *base)
 {
@@ -394,10 +382,6 @@ event_free(struct event *ev)
 	free(ev);
 }
 
-/*
- * Set's the priority of an event - if an event is already scheduled
- * changing the priority is going to fail.
- */
 
 int
 event_priority_set(struct event *ev, int pri)
@@ -411,10 +395,7 @@ event_priority_set(struct event *ev, int pri)
 
 	return (0);
 }
-/* Implementation function to add an event.  Works just like event_add,
- * except: 1) it requires that we have the lock.  2) if tv_is_absolute is set,
- * we treat tv as an absolute time, not as an interval to add to the current
- * time */
+
 static inline int
 event_add_internal(struct event *ev, const struct timeval *tv,
     int tv_is_absolute)
@@ -463,7 +444,6 @@ event_add(struct event *ev, const struct timeval *tv)
 	return (res);
 }
 
-/* Helper for event_del: always called with th_base_lock held. */
 static inline int
 event_del_internal(struct event *ev)
 {
@@ -523,7 +503,6 @@ event_deferred_cb_queue_init(struct deferred_cb_queue *cb)
 	TAILQ_INIT(&cb->deferred_cb_list);
 }
 
-/** Helper for the deferred_cb queue: wake up the event base. */
 static void
 notify_base_cbq_callback(struct deferred_cb_queue *cb, void *baseptr)
 {
@@ -623,7 +602,6 @@ event_active_nolock(struct event *ev, int res)
     event_queue_insert(base, ev, EVLIST_ACTIVE);
 }
 
-/* Remove 'ev' from 'queue' (EVLIST_...) in base. */
 static void
 event_queue_remove(struct event_base *base, struct event *ev, int queue)
 {
@@ -655,7 +633,6 @@ event_queue_insert(struct event_base *base, struct event *ev, int queue)
 {
 
 	if (ev->ev_flags & queue) {
-		/* Double insertion is possible for active events */
 		if (queue & EVLIST_ACTIVE)
 			return;
 
@@ -693,9 +670,7 @@ evthread_notify_read(int fd, short what, void *args)
     thread_posix_unlock(base->th_base_lock, 0);
 }
 
-/** Tell the thread currently running the event_loop for base (if any) that it
- * needs to stop waiting in its dispatch function (if it is) and process all
- * active events and deferred callbacks (if there are any).  */
+
 static int
 evthread_notify_base(struct event_base *base)
 {
@@ -722,7 +697,6 @@ evthread_make_base_notifiable(struct event_base *base)
 	event_assign(&base->notify_ev, base, base->notifyfd,
 				 EV_READ|EV_PERSIST, evthread_notify_read, base);
 
-	/* we need to mark this as internal event */
 	base->notify_ev.ev_flags |= EVLIST_INTERNAL;
 	event_priority_set(&base->notify_ev, 0);
 

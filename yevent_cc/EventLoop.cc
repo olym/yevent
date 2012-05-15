@@ -15,30 +15,51 @@
  *
  * =====================================================================================
  */
+#include <sys/eventfd.h>
+#include <stdio.h>
+#include <vector>
+#include "EventLoop.h"
+#include "Event.h"
+#include "TimerManager.h"
+#include "Multiplexer.h"
+#include "SignalEvent.h"
+
 using namespace yevent;
+
+int createEventfd() 
+{
+    int notifyfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if (notifyfd < 0) {
+        fprintf(stderr, "%s:Failed to create event fd\n", __func__);
+        return -1;
+    }
+
+    return notifyfd;
+}
 
 EventLoop::EventLoop()
     :stop_(false),
     notifyfd_(createEventfd()),
     notifyEvent_(new Event(this, notifyfd_, EV_READ)),
-    mutiplexer_(NewMultiplexerImp(Multiplexer_EPOLL)),
-    timerManager_(new TimerManager(this)),
-    threadId_(Thread::tid());
+    multiplexer_(NewMultiplexerImp(Multiplexer_EPOLL)),
+    timerManager_(new TimerManager(this))
+    //threadId_(Thread::tid())
 {
-    notifyEvent_->setReadCallback(EventCallback cb, NULL);
-    registerEvent(&notifyEvent_);
+    notifyEvent_->setReadCallback(handlerNotify, NULL);
+    registerEvent(notifyEvent_.get());
 }
 
 void EventLoop::registerEvent(Event *event)
 {
     if (registeredEvents_.find(event->getFd()) == registeredEvents_.end()) {
-        if (mutiplexer_->addEvent(event->getFd(), event->getEvent()) != -1)
+        if (multiplexer_->addEvent(event->getFd(), event->getEvent()) != -1)
             registeredEvents_[event->getFd()] = event;
     } else {
         updateEvent(event);
     }
 
 }
+
 void EventLoop::unregisterEvent(Event *ev)
 {
     if (registeredEvents_.find(ev->getFd()) != registeredEvents_.end()) {
@@ -46,13 +67,15 @@ void EventLoop::unregisterEvent(Event *ev)
         registeredEvents_.erase(ev->getFd());
     }
 }
+
 void EventLoop::updateEvent(Event *event)
 {
-    mutiplexer_->updateEvent(event->getFd(), event->getEvent());
+    multiplexer_->updateEvent(event->getFd(), event->getEvent());
 }
+
 void EventLoop::deleteEvent(Event *event)
 {
-    mutiplexer_->deleteEvent(event->getFd(), event->getEvent());
+    multiplexer_->deleteEvent(event->getFd(), event->getEvent());
 }
 
 void EventLoop::dispatch()
@@ -64,29 +87,26 @@ void EventLoop::dispatch()
 
         activeEvents_.clear();
 
-        numevents = mutiplexer_->dispatch();
+        numevents = multiplexer_->dispatch(0);
 
         for (std::vector<Event *>::iterator it = activeEvents_.begin();
-                it != activeEvents_.end(); ++iterator) {
+                it != activeEvents_.end(); ++it) {
             (*it)->handleEvent();
         }
-        timerManager_->handleExpiredTimer();
-        runPendingFunctors();
+        timerManager_->handleTimerEvents();
+        //runPendingFunctors();
     } 
 }
 
 Event* EventLoop::registerSignalEvent(int signo, EventCallback cb, void *arg)
 {
-    Event *ev = new SignalEvent(this, signo, EV_READ);
+    Event *ev = new SignalEvent(this, signo);
     ev->setReadCallback(cb, arg);
     
     registerEvent(ev);
 
     return ev;
 }
-
-
-
 
 long EventLoop::runAt(Timestamp &ts, TimerCallback cb, void *arg)
 {

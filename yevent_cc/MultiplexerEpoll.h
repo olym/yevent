@@ -22,16 +22,15 @@
 
 namespace yevent
 {
+class EventLoop;
 class MultiplexerEpoll : public Mutiplexer
 {
     public:
-        MultiplexerEpoll() 
-          : m_pLoop(NULL),
-            m_epollfd(-1), 
-            m_nEvents(YE_MAXEVENT);
+        MultiplexerEpoll(); 
         virtual ~MultiplexerEpoll();
         virtual int initialize(EventLoop *loop);
         virtual int addEvent(int fd, int mask);
+        virtual int updateEvent(int fd, int mask);
         virtual int deleteEvent(int fd, int mask);
         virtual int dispatch(int timeoutMs);
         virtual const char *getName() = 0;

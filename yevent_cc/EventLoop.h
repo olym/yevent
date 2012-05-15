@@ -21,15 +21,15 @@
 #include <boost/scoped_ptr.hpp>
 #include <map>
 #include <vector>
+#include "Event.h"
 
 namespace yevent
 {
 typedef void (*TimerCallback)(void *args);
 typedef void (*SignalCallback)(void *args);
-class Event;
 class Timestamp;
 class TimerManager;
-class Mutiplexer;
+class Multiplexer;
 
 class EventLoop
 {
@@ -47,18 +47,19 @@ public:
     void deleteEvent(Event *event); // remove event from registeredEvents_, and call mutiplexer_->deleteEvent;
 
 private:
-    void handlerNotify();
 
     bool stop_;
     int notifyfd_; 
-    //Event notifyEvent_;
-    boost::scoped_ptr<Mutiplexer> mutiplexer_;
+    boost::scoped_ptr<Event> notifyEvent_;
+    boost::scoped_ptr<Multiplexer> multiplexer_;
     boost::scoped_ptr<TimerManager> timerManager_;
     std::map<int, Event*> registeredEvents_;
     std::vector<Event *> activeEvents_;
     unsigned long threadId_;
     //MutexLock mutex_;
 };
+int createEventfd();
+void handlerNotify(void *);
 }
 
 

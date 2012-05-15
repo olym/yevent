@@ -17,10 +17,10 @@
  */
 
 #include "Multiplexer.h"
+#include "MultiplexerSelect.h"
+#include "MultiplexerEpoll.h"
 
-using namespace yevent;
-class MultiplexerEpoll;
-class MultiplexerSelect();
+namespace yevent{
 
 Multiplexer *NewMultiplexerImp(int type)
 {
@@ -31,4 +31,6 @@ Multiplexer *NewMultiplexerImp(int type)
         return new MultiplexerSelect();
     }
     return NULL;
+}
+
 }

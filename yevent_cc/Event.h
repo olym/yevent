@@ -17,28 +17,29 @@
  */
 #ifndef __EVENT_H
 #define __EVENT_H
+
+
 namespace yevent{
 
 #define EV_READ 0x01
 
 typedef void (*EventCallback)(void *args);
-class EventLoop;
 struct FireEvent 
 {
     int fd;
     int mask;
 };
-
+class EventLoop;
 class Event
 {
     public:
-        Event(EventLoop *loop, int fd, int event) : pLoop_(loop), fd_(fd), event_(event) {}
+        Event(EventLoop *loop, int fd, int event);
         virtual ~Event();
         virtual void handleEvent();
         void setReadCallback(EventCallback cb, void *args) { readCallback_ = cb; evReadArgs_ = args;}
         void setWriteCallback(EventCallback cb, void *args) { writeCallback_ = cb; evWriteArgs_ = args; }
-        void updateEvent() { pLoop_->updateEvent(this);}
-        void deleteEvent() { pLoop_->deleteEvent(this);}
+        void updateEvent();  
+        void deleteEvent();        
         int getEvent() { return event_;}
         int getFd() { return fd_; }
         void handleRead() { readCallback_(evReadArgs_);}

@@ -22,13 +22,11 @@
 
 namespace yevent
 {
+class EventLoop;
 class MultiplexerSelect : public Mutiplexer
 {
     public:
-        MultiplexerSelect() 
-          : m_pLoop(NULL),
-            m_epollfd(-1), 
-            m_nEvents(YE_MAXEVENT);
+        MultiplexerSelect();
         virtual ~MultiplexerEpoll();
         virtual int initialize(EventLoop *loop);
         virtual int addEvent(int fd, int mask);
@@ -36,7 +34,7 @@ class MultiplexerSelect : public Mutiplexer
         virtual int dispatch(int timeoutMs);
         virtual const char *getName() = 0;
     private:
-        EventLoop *m_pLoop;
+        EventLoop *pLoop;
         int m_epollfd;
         struct epoll_event m_events[YE_MAXEVENT];
         int m_nEvents;

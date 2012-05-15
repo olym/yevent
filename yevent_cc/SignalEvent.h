@@ -17,19 +17,19 @@
  */
 #ifndef __SIGNAL_EVENT_H
 #define __SIGNAL_EVENT_H
-
+#include "Event.h"
 namespace yevent
 {
-    class SignalEvent : public Event
-    {
-        public:
-            SignalEvent(EventLoop *loop, int signo) : Event(loop, signalfd_create(signo), EV_READ) {}
-            virtual ~SignalEvent(){}
-            virtual void handleEvent();
-        private:
-            SignalEvent();
-            int signo_;
-    };
-    int signalfd_create(int signo);
+int signalfd_create(int signo);
+class SignalEvent : public Event
+{
+    public:
+        SignalEvent(EventLoop *loop, int signo) : Event(loop, signalfd_create(signo), EV_READ) {}
+        virtual ~SignalEvent(){}
+        virtual void handleEvent();
+    private:
+        SignalEvent();
+        int signo_;
+};
 }
 #endif 

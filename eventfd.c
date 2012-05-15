@@ -77,10 +77,10 @@ int signalfd_create(int signo)
     return sfd;
 }
 
-void read_signalfd(int timerfd)
+void read_signalfd(int signalfd)
 {
     struct signalfd_siginfo fdsi;
-    int s = read(timerfd, &fdsi, sizeof(struct signalfd_siginfo));
+    int s = read(signalfd, &fdsi, sizeof(struct signalfd_siginfo));
     if (s != sizeof(struct signalfd_siginfo))
         fprintf(stderr, "%s: read error \n", __func__);
     printf("Catch signal %d\n", fdsi.ssi_signo);
