@@ -18,11 +18,7 @@
 #ifndef __MULTIPLEXER_H
 #define __MULTIPLEXER_H
 
-#define AE_NONE 0
-#define AE_READABLE 1
-#define AE_WRITABLE 2
-
-#define YE_MAXEVENT 1024*10;
+#define YE_MAXEVENT 1024*10
 
 #define Multiplexer_EPOLL 1
 #define Multiplexer_SELECT 2

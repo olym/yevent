@@ -36,7 +36,8 @@ public:
         id_(-1),
         when_(when), 
         interval_(interval),
-        repeat_(interval > 0.0)
+        repeat_(interval > 0.0),
+        isValid_(true)
     {
     }
     virtual ~TimerEvent(){}
@@ -61,14 +62,16 @@ private:
 class TimerManager 
 {
     public:
-        TimerManager(EventLoop *loop):timerFd_(CreateTimerfd()), pLoop_(loop), currentTimerId_(0), minHeap_(new MinHeap(NULL, NULL)) {}
+        TimerManager(EventLoop *loop):timerFd_(CreateTimerfd()), pLoop_(loop), currentTimerId_(0), minHeap_(new MinHeap(NULL, NULL)) {
+            minHeap_->init();
+        }
         void deleteTimer(TimerEvent *timer);
         TimerEvent* getNearestValidTimer();
         long addTimer(Timestamp when, double interval, TimerCallback cb, void *args);
         void handleTimerEvents();
 
     private:
-        void resetTimerfd(TimerEvent *event);
+        void resetTimer(TimerEvent *event);
         void updateTimerEvent();
 
         static const int RepeatTimer = 1;

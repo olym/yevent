@@ -16,32 +16,38 @@
  * =====================================================================================
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <assert.h>
 #include "MultiplexerEpoll.h"
+#include "Event.h"
+#include "EventLoop.h"
 
 using namespace yevent;
 
 MultiplexerEpoll::MultiplexerEpoll()
-    :m_pLoop(NULL),
-    m_epollfd(-1),
-    m_nevent(YE_MAXEVENT)
+    :pLoop_(NULL),
+    epollfd_(-1),
+    nEvents_(YE_MAXEVENT)
 {
 
 }
 MultiplexerEpoll::~MultiplexerEpoll()
 {
-    ::close(m_epollfd);
+    ::close(epollfd_);
 }
-MultiplexerEpoll::initialize(EventLoop *loop)
+int MultiplexerEpoll::initialize(EventLoop *loop)
 {
     assert(loop);
 
-    m_pLoop = loop;
-    m_epollfd = ::epoll_create(1024);
-    if (m_epollfd == -1) {
+    pLoop_ = loop;
+    epollfd_ = ::epoll_create(YE_MAXEVENT);
+    if (epollfd_ == -1) {
         //YE_LOG();
         return -1;
     }
-    
     return 0;
 }
 
@@ -53,7 +59,7 @@ int MultiplexerEpoll::addEvent(int fd, int mask)
     if (mask & EV_WRITE) ee.events |= EPOLLOUT;
     ee.data.u64 = 0;
     ee.data.fd = fd;
-    if (epoll_ctl(m_epollfd, EPOLL_CTL_ADD, fd, &ee) == -1 && errno != EEXIST) {
+    if (epoll_ctl(epollfd_, EPOLL_CTL_ADD, fd, &ee) == -1 && errno != EEXIST) {
         fprintf(stderr, "epoll_ctl(%d,%d) failed: %d\n", EPOLL_CTL_ADD,fd,errno);
         return -1;
     }
@@ -67,7 +73,7 @@ int MultiplexerEpoll::deleteEvent(int fd, int delmask)
     ee.events = 0;
     ee.data.fd = fd;
     ee.data.u64 = 0;
-    if (epoll_ctl(m_epollfd, EPOLL_CTL_DEL, fd, &ee) == -1
+    if (epoll_ctl(epollfd_, EPOLL_CTL_DEL, fd, &ee) == -1
             && errno != ENOENT && errno != EBADF) {
         fprintf(stderr, "epoll_ctl(%d,%d) failed: %d\n", EPOLL_CTL_DEL,fd,errno);
         return -1;
@@ -85,7 +91,7 @@ int MultiplexerEpoll::updateEvent(int fd, int mask)
         ee.events |= EPOLLOUT;
     ee.data.u64 = 0;
     ee.data.fd = fd;
-    if (epoll_ctl(m_epollfd, EPOLL_CTL_MOD, fd, &ee) == -1 && errno != EEXIST) {
+    if (epoll_ctl(epollfd_, EPOLL_CTL_MOD, fd, &ee) == -1 && errno != EEXIST) {
         fprintf(stderr, "epoll_ctl(%d, %d) failed: %d\n", EPOLL_CTL_ADD, fd, errno);
         return -1;
     }
@@ -96,29 +102,24 @@ int MultiplexerEpoll::dispatch(int timeoutMs)
 {
     int retval, numevents = 0;
 
-    retval = epoll_wait(m_epollfd, m_events, YE_MAXEVENT, timeoutMs);
+    retval = epoll_wait(epollfd_, events_, YE_MAXEVENT, timeoutMs==0 ? -1: timeoutMs);
     if (retval > 0) {
-        fillActiveEvents(numevents);
+        for (int i = 0; i < retval; i++) {
+            int mask = 0;
+
+            if (events_[i].events & EPOLLIN) mask |= EV_READ;
+            if (events_[i].events & EPOLLOUT) mask |= EV_WRITE;
+
+            if (mask == 0)
+                continue;
+
+            numevents++;
+            Event *ev = pLoop_->getRegisteredEvents(events_[i].data.fd);
+            pLoop_->activeEvent(ev);
+            //ev->setReturnFlags(events_[i].events);
+        }
     }
     return numevents;
-}
-
-void MultiplexerEpoll::fillActiveEvents(int numevents)
-{
-    for (int i = 0; i < numevents; i++) {
-        int mask = 0;
-
-        if (m_events[i] & EPOLLIN) mask |= EV_READ;
-        if (m_events[i] & EPOLLOUT) mask |= EV_WRITE;
-
-        if (mask == 0)
-            continue;
-
-        Event *ev = m_pLoop->registeredEvents_[fd];
-        ev.setReturnFlags(m_events[i].events);
-        activeEvents_.push_back(ev);
-    }
-    
 }
 
 const char* MultiplexerEpoll::getName()

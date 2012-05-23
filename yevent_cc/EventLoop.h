@@ -21,20 +21,22 @@
 #include <boost/scoped_ptr.hpp>
 #include <map>
 #include <vector>
+#include <assert.h>
 #include "Event.h"
+#include "Multiplexer.h"
+#include "TimerManager.h"
 
 namespace yevent
 {
 typedef void (*TimerCallback)(void *args);
 typedef void (*SignalCallback)(void *args);
 class Timestamp;
-class TimerManager;
-class Multiplexer;
 
 class EventLoop
 {
 public:
     EventLoop();
+    void init();
     long runAt(Timestamp &ts, TimerCallback cb, void *privdata);
     long runEvery(double interval, TimerCallback cb, void *privdata);
     long runAfter(double delay, TimerCallback cb, void *privdata);
@@ -45,11 +47,17 @@ public:
     void dispatch();
     void updateEvent(Event *event); // register and update
     void deleteEvent(Event *event); // remove event from registeredEvents_, and call mutiplexer_->deleteEvent;
+    Event *getRegisteredEvents(int fd) {return registeredEvents_[fd];}
+    void activeEvent(Event *event) { assert(event != NULL); activeEvents_.push_back(event);}
 
+    //used to wake up thread loop;
+    void wakeup();
+
+    int notifyfd_; 
+    int isNotifyPending_;
 private:
 
     bool stop_;
-    int notifyfd_; 
     boost::scoped_ptr<Event> notifyEvent_;
     boost::scoped_ptr<Multiplexer> multiplexer_;
     boost::scoped_ptr<TimerManager> timerManager_;
@@ -59,7 +67,7 @@ private:
     //MutexLock mutex_;
 };
 int createEventfd();
-void handlerNotify(void *);
+void handleNotify(void *);
 }
 
 

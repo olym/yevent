@@ -24,10 +24,8 @@
 #include "Event.h"
 #include "SignalEvent.h"
 
-using namespace yevent;
 
-using namespace yevent;
-
+namespace yevent {
 int signalfd_create(int signo)
 {
     sigset_t mask;
@@ -49,6 +47,9 @@ int signalfd_create(int signo)
 
     return sfd;
 }
+}
+
+using namespace yevent;
 
 void SignalEvent::handleEvent()
 {

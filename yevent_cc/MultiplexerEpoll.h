@@ -18,12 +18,13 @@
 #ifndef __MULTIPLEXER_EPOLL_H
 #define __MULTIPLEXER_EPOLL_H
 
+#include <sys/epoll.h>
 #include "Multiplexer.h"
 
 namespace yevent
 {
 class EventLoop;
-class MultiplexerEpoll : public Mutiplexer
+class MultiplexerEpoll : public Multiplexer
 {
     public:
         MultiplexerEpoll(); 
@@ -33,12 +34,12 @@ class MultiplexerEpoll : public Mutiplexer
         virtual int updateEvent(int fd, int mask);
         virtual int deleteEvent(int fd, int mask);
         virtual int dispatch(int timeoutMs);
-        virtual const char *getName() = 0;
+        virtual const char *getName();
     private:
-        EventLoop *m_pLoop;
-        int m_epollfd;
-        struct epoll_event m_events[YE_MAXEVENT];
-        int m_nEvents;
+        EventLoop *pLoop_;
+        int epollfd_;
+        struct epoll_event events_[YE_MAXEVENT];
+        int nEvents_;
 };
 }
 #endif /* __MULTIPLEXER_EPOLL_H */

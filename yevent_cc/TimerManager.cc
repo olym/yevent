@@ -17,15 +17,16 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <sys/timerfd.h>
+#include <iostream>
 #include "EventLoop.h"
 #include "Event.h"
 #include "TimerManager.h"
 #include "MinHeap.h"
 #include "Timestamp.h"
 
-using namespace yevent;
-
+namespace yevent {
 int CreateTimerfd()
 {
     int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
@@ -37,9 +38,12 @@ int CreateTimerfd()
 
     return timerfd;
 }
+}
 
+using namespace yevent;
 void TimerEvent::handleEvent()
 {
+    printf("%s\n", __func__);
     uint64_t exp;
     int s = ::read(getFd(), &exp, sizeof(uint64_t));
     if (s != sizeof(uint64_t))
@@ -51,6 +55,10 @@ void TimerEvent::handleEvent()
 void TimerManager::handleTimerEvents()
 {
     TimerEvent *timer = getNearestValidTimer();
+    if (timer == NULL)
+        return;
+    std::cout << timer->getWhen().toString() << std::endl;
+    std::cout << Timestamp::now().toString() << std::endl;
     while (timer->getWhen() < Timestamp::now()) {
         timer->handleRead();
         if (timer->isRepeat()) {
@@ -58,10 +66,13 @@ void TimerManager::handleTimerEvents()
             timer->setWhen(addTime(timer->getWhen(), timer->getInterval()));
             minHeap_->push(entry);
         } else {
+            pLoop_->unregisterEvent(timer);
             delete minHeap_->pop();
             delete timer;
         }
         timer = getNearestValidTimer();
+        if (timer == NULL)
+            break;
     }
 
     updateTimerEvent();
@@ -69,6 +80,8 @@ void TimerManager::handleTimerEvents()
 
 TimerEvent *TimerManager::getNearestValidTimer()
 {
+    if (minHeap_->size() == 0)
+        return NULL;
     TimerEvent *timer = static_cast<TimerEvent *>(minHeap_->top()->data);
     if (timer == NULL)
         return NULL;
@@ -76,6 +89,8 @@ TimerEvent *TimerManager::getNearestValidTimer()
         delete minHeap_->pop();
         delete timer;
 
+        if (minHeap_->size() == 0)
+            break;
         timer = static_cast<TimerEvent *>(minHeap_->top()->data);
         if (timer == NULL)
             return NULL;
@@ -92,14 +107,32 @@ long TimerManager::addTimer(Timestamp when, double interval, TimerCallback cb, v
     MinHeapEntry *entry = new MinHeapEntry(static_cast<void *>(timer));
     minHeap_->push(entry);
 
+    std::cout << "TimerManager::addTimer :" << when.toString() << std::endl;
     updateTimerEvent();
 
+}
+void TimerManager::resetTimer(TimerEvent *timer)
+{
+  struct itimerspec newValue;
+  long sec, usec;
+  bzero(&newValue, sizeof newValue);
+  TimestampToTimeval(timer->getWhen(), &sec, &usec);
+  newValue.it_value.tv_sec = sec;
+  newValue.it_value.tv_nsec = usec * 1000;
+  printf("%s: sec = %d usec = %d\n", __func__, sec, usec);
+  int ret = timerfd_settime(timerFd_, 0, &newValue, NULL);
+  if (ret) {
+      fprintf(stderr, "%s: timerfd_settime()", __func__);
+  }
 }
 void TimerManager::updateTimerEvent()
 {
     TimerEvent *timer;
-    if (timer = getNearestValidTimer())
+    if (timer = getNearestValidTimer()) {
+        printf("%s\n", __func__);
+        resetTimer(timer);
         pLoop_->updateEvent(timer);
+    }
 }
 void TimerManager::deleteTimer(TimerEvent *timer)
 {

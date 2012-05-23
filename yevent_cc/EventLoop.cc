@@ -18,14 +18,14 @@
 #include <sys/eventfd.h>
 #include <stdio.h>
 #include <vector>
+#include <iostream>
 #include "EventLoop.h"
 #include "Event.h"
 #include "TimerManager.h"
 #include "Multiplexer.h"
 #include "SignalEvent.h"
 
-using namespace yevent;
-
+namespace yevent {
 int createEventfd() 
 {
     int notifyfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
@@ -36,26 +36,48 @@ int createEventfd()
 
     return notifyfd;
 }
+void handleNotify(void *args)
+{
+    EventLoop *loop = static_cast<EventLoop *> (args);
+    uint64_t one;
+    int n = read(loop->notifyfd_, &one, sizeof(one));
+    if (n != sizeof one) {
+        fprintf(stderr, "%s: read error\n", __func__);
+    }
+    
+    loop->isNotifyPending_ = 0;
+
+}
+}
+
+using namespace yevent;
 
 EventLoop::EventLoop()
     :stop_(false),
     notifyfd_(createEventfd()),
+    isNotifyPending_(0),
     notifyEvent_(new Event(this, notifyfd_, EV_READ)),
     multiplexer_(NewMultiplexerImp(Multiplexer_EPOLL)),
     timerManager_(new TimerManager(this))
     //threadId_(Thread::tid())
 {
-    notifyEvent_->setReadCallback(handlerNotify, NULL);
-    registerEvent(notifyEvent_.get());
 }
 
+void EventLoop::init()
+{
+    multiplexer_->initialize(this);
+
+    notifyEvent_->setReadCallback(handleNotify, this);
+    registerEvent(notifyEvent_.get());
+}
 void EventLoop::registerEvent(Event *event)
 {
     if (registeredEvents_.find(event->getFd()) == registeredEvents_.end()) {
         if (multiplexer_->addEvent(event->getFd(), event->getEvent()) != -1)
             registeredEvents_[event->getFd()] = event;
     } else {
-        updateEvent(event);
+        //updateEvent(event);
+        multiplexer_->updateEvent(event->getFd(), event->getEvent());
     }
 
 }
@@ -70,7 +92,12 @@ void EventLoop::unregisterEvent(Event *ev)
 
 void EventLoop::updateEvent(Event *event)
 {
-    multiplexer_->updateEvent(event->getFd(), event->getEvent());
+    if (registeredEvents_.find(event->getFd()) == registeredEvents_.end()) {
+        if (multiplexer_->addEvent(event->getFd(), event->getEvent()) != -1)
+            registeredEvents_[event->getFd()] = event;
+    } else {
+        multiplexer_->updateEvent(event->getFd(), event->getEvent());
+    }
 }
 
 void EventLoop::deleteEvent(Event *event)
@@ -88,6 +115,7 @@ void EventLoop::dispatch()
         activeEvents_.clear();
 
         numevents = multiplexer_->dispatch(0);
+        printf("%s: numevents = %d\n", __func__, numevents);
 
         for (std::vector<Event *>::iterator it = activeEvents_.begin();
                 it != activeEvents_.end(); ++it) {
@@ -108,6 +136,19 @@ Event* EventLoop::registerSignalEvent(int signo, EventCallback cb, void *arg)
     return ev;
 }
 
+void EventLoop::wakeup()
+{
+    uint64_t one = 1;
+    //if the base already has a pending notify, we don't need to write any more
+    if (!isNotifyPending_) {
+        isNotifyPending_ = 1;
+        ssize_t n = write(notifyfd_, &one, sizeof one);
+        if (n != sizeof one) {
+            fprintf(stderr, "%s:write %d bytes instead of 8", __func__, n);
+        }
+    }
+}
+
 long EventLoop::runAt(Timestamp &ts, TimerCallback cb, void *arg)
 {
     return timerManager_->addTimer(ts, 0.0, cb, arg);
@@ -115,6 +156,7 @@ long EventLoop::runAt(Timestamp &ts, TimerCallback cb, void *arg)
 
 long EventLoop::runAfter(double timeout, TimerCallback cb, void *arg)
 {
+    std::cout << "runAfter : now time = Timestamp::now().toString() << std::endl;
     return timerManager_->addTimer(addTime(Timestamp::now(), timeout), 0.0, cb, arg);
 }
 

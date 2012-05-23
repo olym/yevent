@@ -48,7 +48,7 @@ void set_timerfd(int timerfd, const struct timeval *tv)
   bzero(&newValue, sizeof newValue);
   bzero(&oldValue, sizeof oldValue);
   newValue.it_value.tv_sec = tv->tv_sec;
-  newValue.it_value.tv_nsec = tv->tv_usec/1000;
+  newValue.it_value.tv_nsec = tv->tv_usec * 1000;
   int ret = timerfd_settime(timerfd, 0, &newValue, &oldValue);
   if (ret) {
       fprintf(stderr, "%s: timerfd_settime()", __func__);

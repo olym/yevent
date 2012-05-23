@@ -79,6 +79,12 @@ inline Timestamp addTime(Timestamp timestamp, double seconds)
   int64_t delta = static_cast<int64_t>(seconds * Timestamp::kMicroSecondsPerSecond);
   return Timestamp(timestamp.microSecondsSinceEpoch() + delta);
 }
+inline void TimestampToTimeval(Timestamp timestamp, long *sec, long *usec)
+{
+    int64_t diff =  timestamp.microSecondsSinceEpoch() - Timestamp::now().microSecondsSinceEpoch();
+    *sec = diff < 0 ? 0:diff / Timestamp::kMicroSecondsPerSecond;
+    *usec = diff < 0 ? 0: diff % Timestamp::kMicroSecondsPerSecond;
+}
 
 }
 
