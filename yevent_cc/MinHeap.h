@@ -36,7 +36,7 @@ namespace yevent
         int index;
         void *data;
     };
-typedef int(*CompareFunc)(const void *val1, const void *val2);
+typedef int(*CompareFunc)(void *val1, void *val2);
 typedef void (*ElementDestructor)(void *obj);
     class MinHeap
     {

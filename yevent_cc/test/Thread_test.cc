@@ -1,12 +1,12 @@
 /*
  * =====================================================================================
  *
- *       Filename:  EventLoop_timer_test.cc
+ *       Filename:  Thread_test.c
  *
  *    Description:  
  *
  *        Version:  1.0
- *        Created:  2012年05月23日 14时20分30秒
+ *        Created:  05/25/2012 12:06:03 AM
  *       Revision:  none
  *       Compiler:  gcc
  *
@@ -17,21 +17,22 @@
  */
 
 #include <stdio.h>
-#include "../EventLoop.h"
+#include "../Thread.h"
 
 using namespace yevent;
-void timerCallback(void *args)
+
+void *print(void *args)
 {
-    int val = (int)args;
-    printf("%s val = %d\n", __func__, val);
+    while (1){
+        printf("pthread = %d\n", (int)args);
+        sleep(1);
+    }
 }
+
 int main(int argc, char *argv[])
 {
-    EventLoop loop;
-    loop.init();
-    loop.runAfter(2.0, timerCallback, (void *)1);
-    loop.runAfter(4.0, timerCallback, (void *)2);
-    loop.runAfter(5.5, timerCallback, (void *)3);
-    loop.dispatch();
+    Thread thread(print, (void *)123, "thread");
+    thread.start();
+    sleep(20);
     return 0;
 }

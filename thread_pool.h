@@ -25,8 +25,6 @@
 
 typedef void* (*task_cb_fn)(void *);
 
-
-
 struct task {
     TAILQ_ENTRY(task) task_next;
     task_cb_fn task_cb;

@@ -16,3 +16,27 @@
  * =====================================================================================
  */
 
+namespace yevent
+{
+    class ThreadPool {
+        public:
+            ThreadPool();
+            ~ThreadPool();
+
+
+            void start(int numThreads);
+            void stop();
+
+            void run(const Task& f);
+
+        private:
+            void runInThread();
+            Task take();
+
+            MutexLock mutex_;
+            Condition cond_;
+            boost::ptr_vector<muduo::Thread> threads_;
+            std::deque<Task> queue_;
+            bool running_;
+    };
+}

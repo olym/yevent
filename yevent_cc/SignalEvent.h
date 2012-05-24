@@ -24,7 +24,7 @@ int signalfd_create(int signo);
 class SignalEvent : public Event
 {
     public:
-        SignalEvent(EventLoop *loop, int signo) : Event(loop, signalfd_create(signo), EV_READ) {}
+        SignalEvent(EventLoop *loop, int signo) : Event(loop, signalfd_create(signo), EV_READ), signo_(signo) {}
         virtual ~SignalEvent(){}
         virtual void handleEvent();
     private:
