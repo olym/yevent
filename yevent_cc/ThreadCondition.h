@@ -18,20 +18,20 @@
 #ifndef __THREAD_CONDITION_H
 #define __THREAD_CONDITION_H
 
-#include <phread.h>
+#include <pthread.h>
 #include "MutexLock.h"
 
 namespace yevent
 {
-    class Condition
+    class ThreadCondition
     {
         public:
-            explicit Condition(MutexLock& mutex) : mutex_(mutex)
+            explicit ThreadCondition(MutexLock& mutex) : mutex_(mutex)
             {
                 pthread_cond_init(&pcond_, NULL);
             }
 
-            ~Condition()
+            ~ThreadCondition()
             {
                 pthread_cond_destroy(&pcond_);
             }
