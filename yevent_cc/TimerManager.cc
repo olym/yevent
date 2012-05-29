@@ -66,7 +66,7 @@ void TimerManager::handleTimerEvents()
             timer->setWhen(addTime(timer->getWhen(), timer->getInterval()));
             minHeap_->push(entry);
         } else {
-            pLoop_->unregisterEvent(timer);
+            pLoop_->deleteEvent(timer);
             delete minHeap_->pop();
             delete timer;
         }

@@ -19,11 +19,16 @@
 #include <stdio.h>
 #include <vector>
 #include <iostream>
+#include "MutexLock.h"
 #include "EventLoop.h"
 #include "Event.h"
 #include "TimerManager.h"
 #include "Multiplexer.h"
 #include "SignalEvent.h"
+
+/*EventLoop多线程使用说明：EventLoop很多情况下是用在多线程下的，所以如果在另外一个线程给loop所在线程添加事件的话，EvenLoop的大部分成员函数都需要加锁来保证数据的一致性，这样会造成锁的使用频率会很高，为了避免这种情况，可以将添加事件的任务放到该loop所在线程去执行。
+实现这个功能需要在loop中增加执行deferred function的功能，这样只需将要执行的函数放到deferred function queue中，然后通知loop去执行即可，这样我们只需维护保护deferred queue的锁就可以了
+*/
 
 namespace yevent {
 int createEventfd() 
@@ -58,9 +63,15 @@ EventLoop::EventLoop()
     isNotifyPending_(0),
     notifyEvent_(new Event(this, notifyfd_, EV_READ)),
     multiplexer_(NewMultiplexerImp(Multiplexer_EPOLL)),
-    timerManager_(new TimerManager(this))
-    //threadId_(Thread::tid())
+    timerManager_(new TimerManager(this)),
+    threadId_(util::gettid()),
+    mutex_()
 {
+}
+
+EventLoop::~EventLoop()
+{
+
 }
 
 void EventLoop::init()
@@ -70,6 +81,7 @@ void EventLoop::init()
     notifyEvent_->setReadCallback(handleNotify, this);
     registerEvent(notifyEvent_.get());
 }
+
 void EventLoop::registerEvent(Event *event)
 {
     if (registeredEvents_.find(event->getFd()) == registeredEvents_.end()) {
@@ -82,10 +94,10 @@ void EventLoop::registerEvent(Event *event)
 
 }
 
-void EventLoop::unregisterEvent(Event *ev)
+void EventLoop::deleteEvent(Event *ev)
 {
     if (registeredEvents_.find(ev->getFd()) != registeredEvents_.end()) {
-        deleteEvent(ev);
+        multiplexer_->deleteEvent(ev->getFd(), ev->getEvent());
         registeredEvents_.erase(ev->getFd());
     }
 }
@@ -100,14 +112,10 @@ void EventLoop::updateEvent(Event *event)
     }
 }
 
-void EventLoop::deleteEvent(Event *event)
-{
-    multiplexer_->deleteEvent(event->getFd(), event->getEvent());
-}
-
 void EventLoop::dispatch()
 {
     int numevents;
+
     stop_ = false;
 
     while (!stop_) {
@@ -122,8 +130,13 @@ void EventLoop::dispatch()
             (*it)->handleEvent();
         }
         timerManager_->handleTimerEvents();
-        //runPendingFunctors();
+        runDeferredTasks();
     } 
+}
+
+long EventLoop::registerTimerEvent(double timeout, double interval, TimerCallback cb, void *args)
+{
+    return timerManager_->addTimer(addTime(Timestamp::now(), interval==0.0?timeout:interval), interval, cb, args);
 }
 
 Event* EventLoop::registerSignalEvent(int signo, EventCallback cb, void *arg)
@@ -148,25 +161,40 @@ void EventLoop::wakeup()
         }
     }
 }
-
-long EventLoop::runAt(Timestamp &ts, TimerCallback cb, void *arg)
+void EventLoop::breakLoop()
 {
-    return timerManager_->addTimer(ts, 0.0, cb, arg);
+    stop_ = true;
+    if (!isInLoopThread())
+        wakeup();
 }
-
-long EventLoop::runAfter(double timeout, TimerCallback cb, void *arg)
+void EventLoop::runDeferredTasks()
 {
-    std::cout << "runAfter : now time = Timestamp::now().toString() << std::endl;
-    return timerManager_->addTimer(addTime(Timestamp::now(), timeout), 0.0, cb, arg);
+    MutexLockGuard lock(mutex_);
+    for(std::vector<Task>::iterator it = deferredQueue_.begin();
+            it != deferredQueue_.end(); it++)
+        (*it).runTask();
+    deferredQueue_.clear();
 }
-
-long EventLoop::runEvery(double interval, TimerCallback cb, void *arg)
+void EventLoop::runInLoop(Task task)
 {
-    return timerManager_->addTimer(addTime(Timestamp::now(), interval), interval, cb, arg);
+    if (isInLoopThread())
+        task.runTask();
+    else {
+        {
+        MutexLockGuard lock(mutex_);
+        deferredQueue_.push_back(task);
+        }
+        wakeup();
+    }
 }
 
 void EventLoop::deleteTimer(long timerId)
 {
 
+}
+
+bool EventLoop::isInLoopThread()
+{
+    return threadId_ == util::gettid();
 }
 

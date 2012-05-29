@@ -22,6 +22,7 @@
 #include "MutexLock.h"
 #include "ThreadCondition.h"
 #include "Thread.h"
+#include "Task.h"
 
 namespace yevent
 {
@@ -29,15 +30,6 @@ namespace yevent
     class ThreadCondition;
     class Thread;
 
-    typedef void (*TaskFunc)(void *args);
-    class Task {
-        public:
-            Task(TaskFunc taskFunc, void *args) : taskFunc_(taskFunc), args_(args) {}
-            void runTask() { if (taskFunc_) taskFunc_(args_);}
-        private:
-            TaskFunc taskFunc_;
-            void *args_;
-    };
     class ThreadPool {
         public:
             ThreadPool();

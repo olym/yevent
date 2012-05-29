@@ -25,6 +25,8 @@
 #include "Event.h"
 #include "Multiplexer.h"
 #include "TimerManager.h"
+#include "MutexLock.h"
+#include "Task.h"
 
 namespace yevent
 {
@@ -36,26 +38,30 @@ class EventLoop
 {
 public:
     EventLoop();
+    ~EventLoop();
     void init();
-    long runAt(Timestamp &ts, TimerCallback cb, void *privdata);
-    long runEvery(double interval, TimerCallback cb, void *privdata);
-    long runAfter(double delay, TimerCallback cb, void *privdata);
+    long registerTimerEvent(double timeout, double interval, TimerCallback cb, void *privdata);
     void deleteTimer(long timerId);
-    void registerEvent(Event *ev);
-    void unregisterEvent(Event *ev); 
     Event* registerSignalEvent(int signo, SignalCallback cb, void *privdata);
+    void registerEvent(Event *ev);
+    void deleteEvent(Event *ev); // remove event from registeredEvents_, and call mutiplexer_->deleteEvent;
     void dispatch();
     void updateEvent(Event *event); // register and update
-    void deleteEvent(Event *event); // remove event from registeredEvents_, and call mutiplexer_->deleteEvent;
     Event *getRegisteredEvents(int fd) {return registeredEvents_[fd];}
     void activeEvent(Event *event) { assert(event != NULL); activeEvents_.push_back(event);}
 
-    //used to wake up thread loop;
-    void wakeup();
+    //used stop the loop that in another thread
+    void breakLoop();
+    bool isInLoopThread();
+    //put task that will be excuted into the deferredQueue and notify the loop to excute tall asks in the deferredQueue 
+    void runInLoop(Task task);
+    void runDeferredTasks();
 
     int notifyfd_; 
     int isNotifyPending_;
 private:
+    //used to wake up thread loop;
+    void wakeup();
 
     bool stop_;
     boost::scoped_ptr<Event> notifyEvent_;
@@ -63,8 +69,9 @@ private:
     boost::scoped_ptr<TimerManager> timerManager_;
     std::map<int, Event*> registeredEvents_;
     std::vector<Event *> activeEvents_;
+    std::vector<Task> deferredQueue_;
     unsigned long threadId_;
-    //MutexLock mutex_;
+    MutexLock mutex_;
 };
 int createEventfd();
 void handleNotify(void *);
