@@ -16,3 +16,22 @@
  * =====================================================================================
  */
 
+namespace yevent
+{
+    class Acceptor
+    {
+        public:
+            Acceptor();
+            ~Acceptor();
+            void listen()
+            static void handleRead(void *);
+            void handleRead();
+        private:
+            EventLoop *loop_;
+            TcpServer *tcpServer_;
+            int listenfd_;
+            Event acceptEvent_;
+            string point_;
+            bool isListenning_;
+    };
+}

@@ -23,23 +23,29 @@ using std::vector;
 EventLoopThreadPool::EventLoopThreadPool(EventLoop *loop) : 
             baseLooP_(loop), 
             numThreads_(0), 
-            nextLoopIndex_(-1)
+            nextLoopIndex_(-1),
+            isRunning_(false)
 {
 }
 
 EventLoopThreadPool::~EventLoopThreadPool()
 {
+    if (isRunning_)
+        quit();
 }
 void EventLoopThreadPool::start(int numThreads)
 {
     EventLoopThread *thread;
     EventLoop *loop;
-    for (int i = 0; i < numThreads; i++) {
-        thread = new EventLoopThread;
-        threads_.push_back(thread);
-        loop = thread->start();
-        threadLoops_.push_back(loop);
+    if (isRunning_ == false) {
+        for (int i = 0; i < numThreads; i++) {
+            thread = new EventLoopThread;
+            threads_.push_back(thread);
+            loop = thread->start();
+            threadLoops_.push_back(loop);
+        }
     }
+    isRunning_ = true;
 }
 void EventLoopThreadPool::quit()
 {
@@ -49,6 +55,7 @@ void EventLoopThreadPool::quit()
     }
     threads_.clear();
     threadLoops_.clear();
+    isRunning_ = false;
 }
 
 EventLoop *EventLoopThreadPool::getNextLoop()

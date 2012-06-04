@@ -44,8 +44,8 @@ class Event
         //void deleteEvent();        
         int getEvent() { return event_;}
         int getFd() { return fd_; }
-        void handleRead() { readCallback_(evReadArgs_);}
-        void handleWrite() { writeCallback_(evWriteArgs_);}
+        virtual void handleRead() { if (readCallback_) readCallback_(evReadArgs_);}
+        virtual void handleWrite() { if (writeCallback_) writeCallback_(evWriteArgs_);}
         EventLoop *getEventLoop() {return pLoop_;}
     private:
         int fd_;

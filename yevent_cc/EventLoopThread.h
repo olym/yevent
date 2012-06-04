@@ -36,6 +36,7 @@ public:
     void quit();
 private:
     friend void *thread::eventLoopThreadFunc(void *args);
+    bool running_;
     EventLoop *pLoop_;
     MutexLock mutex_;
     ThreadCondition cond_;

@@ -20,6 +20,7 @@
 #include "../EventLoop.h"
 
 using namespace yevent;
+
 void timerCallback(void *args)
 {
     int val = (int)args;
@@ -29,10 +30,10 @@ int main(int argc, char *argv[])
 {
     EventLoop loop;
     loop.init();
-    loop.runLater(5.5, timerCallback, (void *)3);
-    loop.runLater(5.5, timerCallback, (void *)4);
-    loop.runLater(2.0, timerCallback, (void *)1);
-    loop.runEvery(3.3, timerCallback, (void *)2);
+    loop.registerTimerEvent(5.5, 0.0, timerCallback, (void *)3);
+    loop.registerTimerEvent(5.5, 0.0, timerCallback, (void *)4);
+    loop.registerTimerEvent(2.5, 0.0, timerCallback, (void *)1);
+    loop.registerTimerEvent(0.0, 3.3, timerCallback, (void *)2);
     loop.dispatch();
     return 0;
 }

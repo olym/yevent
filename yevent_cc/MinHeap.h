@@ -31,13 +31,10 @@ namespace yevent
     (((i)-1)/2)
 #define MIN_HEAP_INITIAL 8
 
-    struct MinHeapEntry {
-        MinHeapEntry(void *d) : data(d) {}
-        int index;
-        void *data;
-    };
-typedef int(*CompareFunc)(void *val1, void *val2);
+typedef int (*CompareFunc)(void *val1, void *val2);
 typedef void (*ElementDestructor)(void *obj);
+
+template<class T>
     class MinHeap
     {
     public:
@@ -46,71 +43,84 @@ typedef void (*ElementDestructor)(void *obj);
             elemDestructor_(elemDestructor),
             pHeap_(NULL), size_(0), capacity_(0) 
         { }
-        ~MinHeap(){ if (pHeap_) free((void*)pHeap_);}
+        ~MinHeap()
+        { 
+            if (pHeap_) {
+                if (elemDestructor_) {
+                    for (int i = 0; i < size(); i++) {
+                        elemDestructor_(pHeap_[i]);
+                    }
+                }
+                free((void*)pHeap_);
+            }
+        }
         inline void init();
-        inline MinHeapEntry *pop();
-        inline int push(MinHeapEntry *entry);
-        //MinHeapEntry *operator[](const int index) { return pHeap_[index];}
-        MinHeapEntry *getEntry(const int index) { return pHeap_[index];}
+        inline T pop();
+        inline int push(T entry);
+        //T *operator[](const int index) { return pHeap_[index];}
+        T getEntry(int i) { return pHeap_[i];}
         unsigned size() { return size_;}
         unsigned capacity() { return capacity_;}
         bool empty() {return size_ == 0;}
-        MinHeapEntry *top() { return size_?pHeap_[0]:0;}
+        T top() { return size_?pHeap_[0]:0;}
 
     private:
         inline int shiftUp(unsigned holeIndex);
         inline int shiftDown(unsigned holeIndex);
         inline int resize(unsigned n);
-        bool minHeapElemGreater(MinHeapEntry *entry1, MinHeapEntry *entry2)
+        bool minHeapElemGreater(T entry1, T entry2)
         {
-            return compareFunc_ ? compareFunc_(entry1->data, entry2->data) : (entry1->data > entry2->data);
+            return compareFunc_ ? compareFunc_(entry1, entry2) : (entry1 > entry2);
         }
         ElementDestructor elemDestructor_;
         CompareFunc compareFunc_;
-        MinHeapEntry **pHeap_;
+        T *pHeap_;
         unsigned size_;
         unsigned capacity_;
     };
 
-    inline void MinHeap::init()
+template<class T>
+    inline void MinHeap<T>::init()
     {
-        pHeap_ = (MinHeapEntry **)malloc(MIN_HEAP_INITIAL * sizeof(MinHeapEntry *));
+        pHeap_ = (T *)malloc(MIN_HEAP_INITIAL * sizeof(T));
         if (pHeap_ == NULL) {
             return;
         }
         capacity_ = MIN_HEAP_INITIAL;
     }
 
-    inline MinHeapEntry* MinHeap::pop()
+template<class T>
+    inline T MinHeap<T>::pop()
     {
         if (!empty()) {
-            MinHeapEntry *entry = pHeap_[0];
+            T entry = pHeap_[0];
             pHeap_[0] = pHeap_[size_-1];
             size_--;
             shiftDown(0);
-            entry->index = -1;
             return entry;
         }
         return NULL;
     }
     
-    inline int MinHeap::push(MinHeapEntry *entry)
+template<class T>
+    inline int MinHeap<T>::push(T entry)
     {
         if (resize(size_+1) == -1)
             return -1;
         pHeap_[size_] = entry;
-        entry->index = shiftUp(size_++);
+        shiftUp(size_++);
 
         return 0;
     }
 
-    inline int MinHeap::shiftUp(unsigned holeIndex)
+template<class T>
+    inline int MinHeap<T>::shiftUp(unsigned holeIndex)
     {
         if (holeIndex == 0)
             return 0;
         unsigned parent_index = heap_parent(holeIndex),
                  min_index = holeIndex;
-        MinHeapEntry *tmp;
+        T tmp;
 
         if (parent_index >= 0 && minHeapElemGreater(pHeap_[parent_index], pHeap_[min_index])) {
             tmp = pHeap_[min_index];
@@ -121,13 +131,15 @@ typedef void (*ElementDestructor)(void *obj);
         }
         return holeIndex;
     }
-    inline int MinHeap::shiftDown(unsigned holeIndex)
+
+template<class T>
+    inline int MinHeap<T>::shiftDown(unsigned holeIndex)
     {
         unsigned min_index = holeIndex,
                  left_index = heap_left(holeIndex), 
                  right_index = heap_right(holeIndex);
         unsigned heap_size = size_;
-        MinHeapEntry *tmp;
+        T tmp;
 
         if (left_index < heap_size && minHeapElemGreater(pHeap_[min_index], pHeap_[left_index]))
             min_index = left_index;
@@ -144,14 +156,15 @@ typedef void (*ElementDestructor)(void *obj);
 
     }
 
-    inline int MinHeap::resize(unsigned n)
+template<class T>
+    inline int MinHeap<T>::resize(unsigned n)
     {
         if (capacity_ < n) {
             unsigned a = capacity_ ? capacity_ * 2 : 8;
-            MinHeapEntry **p;
+            T *p;
             if (a < n)
                 a = n;
-            if (!(p = (MinHeapEntry **)realloc(pHeap_, a)))
+            if (!(p = (T *)realloc(pHeap_, a)))
                 return -1;
             pHeap_ = p;
             capacity_ = a;

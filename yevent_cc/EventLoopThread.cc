@@ -21,6 +21,7 @@
 using namespace yevent;
 
 EventLoopThread::EventLoopThread() :
+    running_(false),
     pLoop_(NULL),
     mutex_(),
     cond_(mutex_),
@@ -29,10 +30,12 @@ EventLoopThread::EventLoopThread() :
 }
 EventLoopThread::~EventLoopThread()
 {
-    quit();
+    if (running_ == true)
+        quit();
 }
 EventLoop* EventLoopThread::start()
 {
+    running_ = true;
     thread_.start(); 
     MutexLockGuard lock(mutex_);
     while (!pLoop_) {
@@ -45,6 +48,7 @@ void EventLoopThread::quit()
 {
     pLoop_->breakLoop();
     thread_.join();
+    running_ = false;
 }
 
 namespace  yevent {

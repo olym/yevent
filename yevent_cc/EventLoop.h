@@ -56,6 +56,7 @@ public:
     //put task that will be excuted into the deferredQueue and notify the loop to excute tall asks in the deferredQueue 
     void runInLoop(Task task);
     void runDeferredTasks();
+    void assertInLoopThread();
 
     int notifyfd_; 
     int isNotifyPending_;

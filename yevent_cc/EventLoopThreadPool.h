@@ -39,6 +39,7 @@ class EventLoopThreadPool
         std::vector<EventLoopThread *> threads_;
         std::vector<EventLoop *> threadLoops_;
         int nextLoopIndex_;
+        bool isRunning_;
 };
 }
 #endif

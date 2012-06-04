@@ -30,6 +30,14 @@ Timestamp::Timestamp(int64_t microseconds)
 {
 }
 
+Timestamp::Timestamp(double timeout)
+    :microSecondsSinceEpoch_(0)
+{
+
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  microSecondsSinceEpoch_ = static_cast<int64_t>(tv.tv_sec) * kMicroSecondsPerSecond + tv.tv_usec + static_cast<int64_t>(timeout) * kMicroSecondsPerSecond;
+}
 string Timestamp::toString() const
 {
   char buf[32] = {0};

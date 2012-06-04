@@ -76,6 +76,7 @@ EventLoop::~EventLoop()
 
 void EventLoop::init()
 {
+    assertInLoopThread();
     multiplexer_->initialize(this);
 
     notifyEvent_->setReadCallback(handleNotify, this);
@@ -84,6 +85,7 @@ void EventLoop::init()
 
 void EventLoop::registerEvent(Event *event)
 {
+    assertInLoopThread();
     if (registeredEvents_.find(event->getFd()) == registeredEvents_.end()) {
         if (multiplexer_->addEvent(event->getFd(), event->getEvent()) != -1)
             registeredEvents_[event->getFd()] = event;
@@ -96,6 +98,7 @@ void EventLoop::registerEvent(Event *event)
 
 void EventLoop::deleteEvent(Event *ev)
 {
+    assertInLoopThread();
     if (registeredEvents_.find(ev->getFd()) != registeredEvents_.end()) {
         multiplexer_->deleteEvent(ev->getFd(), ev->getEvent());
         registeredEvents_.erase(ev->getFd());
@@ -104,6 +107,7 @@ void EventLoop::deleteEvent(Event *ev)
 
 void EventLoop::updateEvent(Event *event)
 {
+    assertInLoopThread();
     if (registeredEvents_.find(event->getFd()) == registeredEvents_.end()) {
         if (multiplexer_->addEvent(event->getFd(), event->getEvent()) != -1)
             registeredEvents_[event->getFd()] = event;
@@ -114,6 +118,7 @@ void EventLoop::updateEvent(Event *event)
 
 void EventLoop::dispatch()
 {
+    assertInLoopThread();
     int numevents;
 
     stop_ = false;
@@ -136,11 +141,14 @@ void EventLoop::dispatch()
 
 long EventLoop::registerTimerEvent(double timeout, double interval, TimerCallback cb, void *args)
 {
-    return timerManager_->addTimer(addTime(Timestamp::now(), interval==0.0?timeout:interval), interval, cb, args);
+    assertInLoopThread();
+    //return timerManager_->addTimer(addTime(Timestamp::now(), (int)interval==0?timeout:interval), interval, cb, args);
+    return timerManager_->addTimer(timeout, interval, cb, args);
 }
 
 Event* EventLoop::registerSignalEvent(int signo, EventCallback cb, void *arg)
 {
+    assertInLoopThread();
     Event *ev = new SignalEvent(this, signo);
     ev->setReadCallback(cb, arg);
     
@@ -163,6 +171,7 @@ void EventLoop::wakeup()
 }
 void EventLoop::breakLoop()
 {
+    assertInLoopThread();
     stop_ = true;
     if (!isInLoopThread())
         wakeup();
@@ -198,3 +207,7 @@ bool EventLoop::isInLoopThread()
     return threadId_ == util::gettid();
 }
 
+void EventLoop::assertInLoopThread()
+{
+    assert(isInLoopThread());
+}

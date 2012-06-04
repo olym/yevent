@@ -59,19 +59,21 @@ private:
     bool isValid_;
 };
 
+int TimerCompareFunc(void *val1, void *val2);
+
 class TimerManager 
 {
     public:
-        TimerManager(EventLoop *loop):timerFd_(CreateTimerfd()), pLoop_(loop), currentTimerId_(0), minHeap_(new MinHeap(NULL, NULL)) {
+        TimerManager(EventLoop *loop):timerFd_(CreateTimerfd()), pLoop_(loop), currentTimerId_(0), minHeap_(new MinHeap<TimerEvent *>(TimerCompareFunc, NULL)) {
             minHeap_->init();
         }
         void deleteTimer(TimerEvent *timer);
         TimerEvent* getNearestValidTimer();
-        long addTimer(Timestamp when, double interval, TimerCallback cb, void *args);
+        long addTimer(double timeout, double interval, TimerCallback cb, void *args);
         void handleTimerEvents();
 
     private:
-        void resetTimer(TimerEvent *event);
+        void timerfdSetTimer(TimerEvent *event);
         void updateTimerEvent();
 
         static const int RepeatTimer = 1;
@@ -80,7 +82,7 @@ class TimerManager
         EventLoop *pLoop_;
         TimerEvent *currentTimer_;
         long currentTimerId_;
-        boost::scoped_ptr<MinHeap> minHeap_;
+        boost::scoped_ptr< MinHeap<TimerEvent*> > minHeap_;
 };
 
 

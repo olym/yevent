@@ -32,6 +32,7 @@ class Timestamp
   {
   }
 
+  explicit Timestamp(double timeout);
   explicit Timestamp(int64_t microSecondsSinceEpoch);
 
   void swap(Timestamp& that)
@@ -63,6 +64,10 @@ inline bool operator<(Timestamp lhs, Timestamp rhs)
   return lhs.microSecondsSinceEpoch() < rhs.microSecondsSinceEpoch();
 }
 
+inline bool operator>(Timestamp lhs, Timestamp rhs)
+{
+  return lhs.microSecondsSinceEpoch() > rhs.microSecondsSinceEpoch();
+}
 inline bool operator==(Timestamp lhs, Timestamp rhs)
 {
   return lhs.microSecondsSinceEpoch() == rhs.microSecondsSinceEpoch();
