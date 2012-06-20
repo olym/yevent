@@ -20,8 +20,17 @@
 
 namespace yevent {
     namespace util {
+        /* Log levels */
+#define YEVENT_DEBUG 0
+#define YEVENT_VERBOSE 1
+#define YEVENT_NOTICE 2
+#define YEVENT_WARNING 3
+#define YEVENT_MAX_LOGMSG_LEN 4096
+        
+        int gettid();
         void GetTime(long *seconds, long *milliseconds);
         void AddMillisecondsToNow(long long milliseconds, long *sec, long *ms);
+        void yeventLog(int level, const char *fmt, ...);
     }
 }
 #endif

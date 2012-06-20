@@ -17,6 +17,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -24,6 +25,7 @@
 #include "MultiplexerEpoll.h"
 #include "Event.h"
 #include "EventLoop.h"
+#include "Utility.h"
 
 using namespace yevent;
 
@@ -60,7 +62,7 @@ int MultiplexerEpoll::addEvent(int fd, int mask)
     ee.data.u64 = 0;
     ee.data.fd = fd;
     if (epoll_ctl(epollfd_, EPOLL_CTL_ADD, fd, &ee) == -1 && errno != EEXIST) {
-        fprintf(stderr, "epoll_ctl(%d,%d) failed: %d\n", EPOLL_CTL_ADD,fd,errno);
+        util::yeventLog(YEVENT_WARNING, "epoll_ctl(%d,%d) failed: %d\n", EPOLL_CTL_ADD,fd,errno);
         return -1;
     }
     return 0;
@@ -75,7 +77,7 @@ int MultiplexerEpoll::deleteEvent(int fd, int delmask)
     ee.data.u64 = 0;
     if (epoll_ctl(epollfd_, EPOLL_CTL_DEL, fd, &ee) == -1
             && errno != ENOENT && errno != EBADF) {
-        fprintf(stderr, "epoll_ctl(%d,%d) failed: %d\n", EPOLL_CTL_DEL,fd,errno);
+        util::yeventLog(YEVENT_WARNING, "epoll_ctl(%d,%d) failed: %d\n", EPOLL_CTL_DEL,fd,errno);
         return -1;
     }
     return 0;
@@ -92,7 +94,7 @@ int MultiplexerEpoll::updateEvent(int fd, int mask)
     ee.data.u64 = 0;
     ee.data.fd = fd;
     if (epoll_ctl(epollfd_, EPOLL_CTL_MOD, fd, &ee) == -1 && errno != EEXIST) {
-        fprintf(stderr, "epoll_ctl(%d, %d) failed: %d\n", EPOLL_CTL_ADD, fd, errno);
+        util::yeventLog(YEVENT_WARNING, "epoll_ctl(%d, %d) failed: %d\n", EPOLL_CTL_ADD, fd, errno);
         return -1;
     }
     return 0;
@@ -107,6 +109,7 @@ int MultiplexerEpoll::dispatch(int timeoutMs)
         for (int i = 0; i < retval; i++) {
             int mask = 0;
 
+            util::yeventLog(YEVENT_DEBUG, "epoll_wait return %d, fd = %d, event = %d", retval, events_[i].data.fd, events_[i].events);
             if (events_[i].events & EPOLLIN) mask |= EV_READ;
             if (events_[i].events & EPOLLOUT) mask |= EV_WRITE;
 
@@ -115,10 +118,16 @@ int MultiplexerEpoll::dispatch(int timeoutMs)
 
             numevents++;
             Event *ev = pLoop_->getRegisteredEvents(events_[i].data.fd);
+            ev->setREvent(mask);
             pLoop_->activeEvent(ev);
             //ev->setReturnFlags(events_[i].events);
         }
-    }
+    } else if (retval == 0)
+        util::yeventLog(YEVENT_DEBUG, "epoll_wait return 0");
+    else 
+        util::yeventLog(YEVENT_WARNING, "epoll_wait error:%s", strerror(errno));
+
+    
     return numevents;
 }
 

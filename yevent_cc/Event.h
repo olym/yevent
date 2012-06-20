@@ -21,7 +21,6 @@
 #include "Event_Struct.h"
 namespace yevent{
 
-
 typedef void (*EventCallback)(void *args);
 struct FireEvent 
 {
@@ -32,16 +31,22 @@ class EventLoop;
 class Event
 {
     public:
-        Event(EventLoop *loop, int fd, int event): pLoop_(loop), fd_(fd), event_(event) {}
+        Event(EventLoop *loop, int fd, int event): 
+            pLoop_(loop), 
+            fd_(fd), 
+            event_(event),
+            revent_(0) {}
         virtual ~Event(){}
         virtual void handleEvent() {
-            if (event_ & EV_READ) handleRead();
-            if (event_ & EV_WRITE) handleWrite();
+            if (revent_ & EV_READ) handleRead();
+            if (revent_ & EV_WRITE) handleWrite();
         }
         void setReadCallback(EventCallback cb, void *args) { readCallback_ = cb; evReadArgs_ = args;}
         void setWriteCallback(EventCallback cb, void *args) { writeCallback_ = cb; evWriteArgs_ = args; }
-        //void updateEvent();  
-        //void deleteEvent();        
+        void updateEvent();
+        void deleteEvent();
+        void setEvent(int event) { event_ = event;}
+        void setREvent(int event) { revent_ = event;}
         int getEvent() { return event_;}
         int getFd() { return fd_; }
         virtual void handleRead() { if (readCallback_) readCallback_(evReadArgs_);}
@@ -50,6 +55,7 @@ class Event
     private:
         int fd_;
         int event_; //EV_READ; EV_WRITE;
+        int revent_;  // return event mask;
         EventLoop *pLoop_;
         EventCallback readCallback_;
         EventCallback writeCallback_;

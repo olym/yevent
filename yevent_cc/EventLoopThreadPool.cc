@@ -23,7 +23,7 @@ using std::vector;
 EventLoopThreadPool::EventLoopThreadPool(EventLoop *loop) : 
             baseLooP_(loop), 
             numThreads_(0), 
-            nextLoopIndex_(-1),
+            nextLoopIndex_(0),
             isRunning_(false)
 {
 }
@@ -38,12 +38,14 @@ void EventLoopThreadPool::start(int numThreads)
     EventLoopThread *thread;
     EventLoop *loop;
     if (isRunning_ == false) {
+        util::yeventLog(YEVENT_DEBUG, "EventLoopThreadPool::%d thread start", numThreads);
         for (int i = 0; i < numThreads; i++) {
             thread = new EventLoopThread;
             threads_.push_back(thread);
             loop = thread->start();
             threadLoops_.push_back(loop);
         }
+        numThreads_ = numThreads;
     }
     isRunning_ = true;
 }

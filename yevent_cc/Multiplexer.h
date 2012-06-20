@@ -17,7 +17,6 @@
  */
 #ifndef __MULTIPLEXER_H
 #define __MULTIPLEXER_H
-
 #define YE_MAXEVENT 1024*10
 
 #define Multiplexer_EPOLL 1

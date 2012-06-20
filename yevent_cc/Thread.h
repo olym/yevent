@@ -23,9 +23,6 @@
 
 namespace yevent
 {
-    namespace util {
-        pid_t gettid();
-    }
     
     typedef void *(*ThreadFunc)(void *);
 

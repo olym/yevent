@@ -25,6 +25,7 @@
 #include "TimerManager.h"
 #include "Multiplexer.h"
 #include "SignalEvent.h"
+#include "Utility.h"
 
 /*EventLoop多线程使用说明：EventLoop很多情况下是用在多线程下的，所以如果在另外一个线程给loop所在线程添加事件的话，EvenLoop的大部分成员函数都需要加锁来保证数据的一致性，这样会造成锁的使用频率会很高，为了避免这种情况，可以将添加事件的任务放到该loop所在线程去执行。
 实现这个功能需要在loop中增加执行deferred function的功能，这样只需将要执行的函数放到deferred function queue中，然后通知loop去执行即可，这样我们只需维护保护deferred queue的锁就可以了
@@ -35,7 +36,7 @@ int createEventfd()
 {
     int notifyfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (notifyfd < 0) {
-        fprintf(stderr, "%s:Failed to create event fd\n", __func__);
+        util::yeventLog(YEVENT_WARNING, "%s:Failed to create event fd", __func__);
         return -1;
     }
 
@@ -47,7 +48,7 @@ void handleNotify(void *args)
     uint64_t one;
     int n = read(loop->notifyfd_, &one, sizeof(one));
     if (n != sizeof one) {
-        fprintf(stderr, "%s: read error\n", __func__);
+        util::yeventLog(YEVENT_WARNING, "%s: read error", __func__);
     }
     
     loop->isNotifyPending_ = 0;
@@ -67,6 +68,10 @@ EventLoop::EventLoop()
     threadId_(util::gettid()),
     mutex_()
 {
+    multiplexer_->initialize(this);
+
+    notifyEvent_->setReadCallback(handleNotify, this);
+    registerEvent(notifyEvent_.get());
 }
 
 EventLoop::~EventLoop()
@@ -74,18 +79,17 @@ EventLoop::~EventLoop()
 
 }
 
-void EventLoop::init()
-{
-    assertInLoopThread();
-    multiplexer_->initialize(this);
-
-    notifyEvent_->setReadCallback(handleNotify, this);
-    registerEvent(notifyEvent_.get());
-}
+//void EventLoop::init()
+//{
+//    multiplexer_->initialize(this);
+//
+//    notifyEvent_->setReadCallback(handleNotify, this);
+//    registerEvent(notifyEvent_.get());
+//}
 
 void EventLoop::registerEvent(Event *event)
 {
-    assertInLoopThread();
+    assert(isInLoopThread());
     if (registeredEvents_.find(event->getFd()) == registeredEvents_.end()) {
         if (multiplexer_->addEvent(event->getFd(), event->getEvent()) != -1)
             registeredEvents_[event->getFd()] = event;
@@ -98,7 +102,7 @@ void EventLoop::registerEvent(Event *event)
 
 void EventLoop::deleteEvent(Event *ev)
 {
-    assertInLoopThread();
+    assert(isInLoopThread());
     if (registeredEvents_.find(ev->getFd()) != registeredEvents_.end()) {
         multiplexer_->deleteEvent(ev->getFd(), ev->getEvent());
         registeredEvents_.erase(ev->getFd());
@@ -107,7 +111,8 @@ void EventLoop::deleteEvent(Event *ev)
 
 void EventLoop::updateEvent(Event *event)
 {
-    assertInLoopThread();
+    assert(isInLoopThread());
+    util::yeventLog(YEVENT_DEBUG, "%s: fd = %d event = %d", __func__, event->getFd(), event->getEvent());
     if (registeredEvents_.find(event->getFd()) == registeredEvents_.end()) {
         if (multiplexer_->addEvent(event->getFd(), event->getEvent()) != -1)
             registeredEvents_[event->getFd()] = event;
@@ -118,9 +123,8 @@ void EventLoop::updateEvent(Event *event)
 
 void EventLoop::dispatch()
 {
-    assertInLoopThread();
+    assert(isInLoopThread());
     int numevents;
-
     stop_ = false;
 
     while (!stop_) {
@@ -128,7 +132,6 @@ void EventLoop::dispatch()
         activeEvents_.clear();
 
         numevents = multiplexer_->dispatch(0);
-        printf("%s: numevents = %d\n", __func__, numevents);
 
         for (std::vector<Event *>::iterator it = activeEvents_.begin();
                 it != activeEvents_.end(); ++it) {
@@ -141,14 +144,14 @@ void EventLoop::dispatch()
 
 long EventLoop::registerTimerEvent(double timeout, double interval, TimerCallback cb, void *args)
 {
-    assertInLoopThread();
+    assert(isInLoopThread());
     //return timerManager_->addTimer(addTime(Timestamp::now(), (int)interval==0?timeout:interval), interval, cb, args);
     return timerManager_->addTimer(timeout, interval, cb, args);
 }
 
 Event* EventLoop::registerSignalEvent(int signo, EventCallback cb, void *arg)
 {
-    assertInLoopThread();
+    assert(isInLoopThread());
     Event *ev = new SignalEvent(this, signo);
     ev->setReadCallback(cb, arg);
     
@@ -171,21 +174,28 @@ void EventLoop::wakeup()
 }
 void EventLoop::breakLoop()
 {
-    assertInLoopThread();
+    assert(isInLoopThread());
     stop_ = true;
     if (!isInLoopThread())
         wakeup();
 }
 void EventLoop::runDeferredTasks()
 {
+    util::yeventLog(YEVENT_DEBUG, "%s: task num = %d",__func__, deferredQueue_.size());
     MutexLockGuard lock(mutex_);
     for(std::vector<Task>::iterator it = deferredQueue_.begin();
             it != deferredQueue_.end(); it++)
         (*it).runTask();
     deferredQueue_.clear();
 }
+void EventLoop::runInLoop(TaskFunc func, void *args)
+{
+    Task task(func, args);
+    runInLoop(task);
+}
 void EventLoop::runInLoop(Task task)
 {
+    util::yeventLog(YEVENT_DEBUG, "%s:threadId_ = %d tid = %d", __func__, threadId_, util::gettid());
     if (isInLoopThread())
         task.runTask();
     else {
@@ -204,7 +214,7 @@ void EventLoop::deleteTimer(long timerId)
 
 bool EventLoop::isInLoopThread()
 {
-    return threadId_ == util::gettid();
+    return (threadId_ == util::gettid());
 }
 
 void EventLoop::assertInLoopThread()

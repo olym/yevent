@@ -22,24 +22,26 @@
 #include <map>
 #include <vector>
 #include <assert.h>
-#include "Event.h"
+//#include "Event.h"
 #include "Multiplexer.h"
 #include "TimerManager.h"
 #include "MutexLock.h"
 #include "Task.h"
+#include "Utility.h"
 
 namespace yevent
 {
 typedef void (*TimerCallback)(void *args);
 typedef void (*SignalCallback)(void *args);
 class Timestamp;
+class Event;
 
 class EventLoop
 {
 public:
     EventLoop();
     ~EventLoop();
-    void init();
+    //void init();
     long registerTimerEvent(double timeout, double interval, TimerCallback cb, void *privdata);
     void deleteTimer(long timerId);
     Event* registerSignalEvent(int signo, SignalCallback cb, void *privdata);
@@ -55,6 +57,7 @@ public:
     bool isInLoopThread();
     //put task that will be excuted into the deferredQueue and notify the loop to excute tall asks in the deferredQueue 
     void runInLoop(Task task);
+    void runInLoop(TaskFunc func, void *args);
     void runDeferredTasks();
     void assertInLoopThread();
 

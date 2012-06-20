@@ -16,21 +16,15 @@
  * =====================================================================================
  */
 
-#include "Thread.h"
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <assert.h>
 #include <string>
+#include "Thread.h"
+#include "Utility.h"
 
 namespace yevent {
-    namespace util {
-        //Glibc does not provide a wrapper for this system call; call it using syscall
-        pid_t gettid()
-        {
-            return static_cast<pid_t>(::syscall(SYS_gettid));
-        }
-    }
 }
 
 using namespace yevent;

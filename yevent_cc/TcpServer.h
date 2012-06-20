@@ -15,31 +15,46 @@
  *
  * =====================================================================================
  */
+#ifndef __TCP_SERVER_H
+#define __TCP_SERVER_H
+
+#include "EventLoopThreadPool.h"
+#include "Acceptor.h"
+#include <string>
+#include <map>
 
 namespace yevent {
+    class InetSockAddr;
+    class Buffer;
+    class Connection;
+    //class MutexLock;
+    class EventLoop;
     class TcpServer {
-    publuc:
-        TcpServer(EventLoop *loop, std::string port, std::string name);
+    public:
+        TcpServer(EventLoop *loop, int port, std::string name);
         ~TcpServer();
-        virtual void dataReceived(TcpConnectionPtr conn, Buffer *buffer);
-        virtual void connectionMake(TcpConnectionPtr conn);
-        virtual void connectionLost(TcpConnectionPtr conn);
+        virtual void dataReceived(Connection* conn, Buffer *buffer) {}
+        virtual void dataWriteDone(Connection *conn) {}
+        virtual void connectionMake(Connection* conn) {}
+        virtual void connectionLost(Connection* conn) {}
         
         void newConnection(int connfd, InetSockAddr peerAddr);
-        void setThreadNums(int nums) { threadNums_ = nums };
+        void setThreadNums(int nums) { threadNums_ = nums; };
         void start();
-        const string &port() const { return port_ };
-        const string &name() const { return name_; }
+        const int &port() const { return port_; };
+        const std::string &name() const { return name_; }
         void removeConnection(Connection *conn);
     private:
-        static void removeConnection(TcpServer *server_, Connection *conn);
-        bool running_;
         EventLoop *loop_;
-        string std::port_;
-        string std::name_;
+        int port_;
+        std::string name_;
         Acceptor acceptor_;
         unsigned int threadNums_;
         EventLoopThreadPool threadPool_;
         std::map<int, Connection *> conns_;
+        bool isRunning_;
+        MutexLock mutex_;  // used to guard conns_;
     };
 }
+
+#endif

@@ -48,6 +48,15 @@ int TimerCompareFunc(void *val1, void *val2)
 }
 
 using namespace yevent;
+TimerEvent::TimerEvent(EventLoop *loop, int fd, Timestamp when, double interval) :
+    Event(loop, fd, EV_READ),
+    id_(-1),
+    when_(when), 
+    interval_(interval),
+    repeat_(interval > 0.0),
+    isValid_(true)
+{
+}
 void TimerEvent::handleEvent()
 {
     uint64_t exp;
@@ -58,8 +67,17 @@ void TimerEvent::handleEvent()
     //readCallback_(evReadArgs_);
 }
 
+TimerManager::TimerManager(EventLoop *loop):
+    timerFd_(CreateTimerfd()), pLoop_(loop), 
+    currentTimerId_(0), 
+    minHeap_(new MinHeap<TimerEvent *>(TimerCompareFunc, NULL)) 
+{
+    minHeap_->init();
+}
+
 void TimerManager::handleTimerEvents()
 {
+    util::yeventLog(YEVENT_DEBUG, "%s", __func__);
     TimerEvent *timer = getNearestValidTimer();
     if (timer == NULL)
         return;

@@ -57,7 +57,7 @@ void *eventLoopThreadFunc(void *args)
 {
     EventLoopThread *elt = static_cast<EventLoopThread *>(args);
     EventLoop loop;
-    loop.init();
+    //loop.init();
     {
         MutexLockGuard lock(elt->mutex_);
         elt->pLoop_ = &loop;

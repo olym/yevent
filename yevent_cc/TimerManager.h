@@ -31,15 +31,7 @@ class EventLoop;
 class TimerEvent : public Event
 {
 public:
-    TimerEvent(EventLoop *loop, int fd, Timestamp when, double interval)
-        :Event(loop, fd, EV_READ),
-        id_(-1),
-        when_(when), 
-        interval_(interval),
-        repeat_(interval > 0.0),
-        isValid_(true)
-    {
-    }
+    TimerEvent(EventLoop *loop, int fd, Timestamp when, double interval);
     virtual ~TimerEvent(){}
 
     virtual void handleEvent();
@@ -64,9 +56,7 @@ int TimerCompareFunc(void *val1, void *val2);
 class TimerManager 
 {
     public:
-        TimerManager(EventLoop *loop):timerFd_(CreateTimerfd()), pLoop_(loop), currentTimerId_(0), minHeap_(new MinHeap<TimerEvent *>(TimerCompareFunc, NULL)) {
-            minHeap_->init();
-        }
+        TimerManager(EventLoop *loop);
         void deleteTimer(TimerEvent *timer);
         TimerEvent* getNearestValidTimer();
         long addTimer(double timeout, double interval, TimerCallback cb, void *args);
