@@ -32,7 +32,7 @@ namespace yevent {
     class TcpServer {
     public:
         TcpServer(EventLoop *loop, int port, std::string name);
-        ~TcpServer();
+        virtual~TcpServer();
         virtual void dataReceived(Connection* conn, Buffer *buffer) {}
         virtual void dataWriteDone(Connection *conn) {}
         virtual void connectionMake(Connection* conn) {}

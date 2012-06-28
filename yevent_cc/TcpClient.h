@@ -16,3 +16,27 @@
  * =====================================================================================
  */
 
+#ifndef __TPC_CLIENT_H
+#define __TPC_CLIENT_H
+namespace yevent {
+    class TcpClient {
+    public:
+        TcpClient(EventLoop *loop, std::string name);
+        virtual TcpClient();
+        virtual void dataReceived(Connection* conn, Buffer *buffer) {}
+        virtual void dataWriteDone(Connection *conn) {}
+        virtual void connectionMake(Connection* conn) {}
+        virtual void connectionLost(Connection* conn) {}
+        void newConnection();
+        void connect(std::string host, int port);
+        void disconnect();
+    private:
+        EventLoop *loop_;
+        std::string name_;
+        bool isConnected_;
+        Connector connector_;
+        Connection *conn_;
+    };
+}
+
+#endif /* TCP_CLIENT_H */
