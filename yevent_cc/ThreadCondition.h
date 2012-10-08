@@ -3,15 +3,15 @@
  *
  *       Filename:  ThreadCondition.h
  *
- *    Description:  
+ *    Description:
  *
  *        Version:  1.0
  *        Created:  2012年05月24日 13时55分27秒
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  YOUR NAME (), 
- *        Company:  
+ *         Author:  YOUR NAME (),
+ *        Company:
  *
  * =====================================================================================
  */
@@ -23,37 +23,32 @@
 
 namespace yevent
 {
-    class ThreadCondition
-    {
-        public:
-            explicit ThreadCondition(MutexLock& mutex) : mutex_(mutex)
-            {
-                pthread_cond_init(&pcond_, NULL);
-            }
+class ThreadCondition
+{
+public:
+    explicit ThreadCondition(MutexLock& mutex) : mutex_(mutex) {
+        pthread_cond_init(&pcond_, NULL);
+    }
 
-            ~ThreadCondition()
-            {
-                pthread_cond_destroy(&pcond_);
-            }
+    ~ThreadCondition() {
+        pthread_cond_destroy(&pcond_);
+    }
 
-            void wait()
-            {
-                pthread_cond_wait(&pcond_, mutex_.getPthreadMutex());
-            }
+    void wait() {
+        pthread_cond_wait(&pcond_, mutex_.getPthreadMutex());
+    }
 
-            void notify()
-            {
-                pthread_cond_signal(&pcond_);
-            }
+    void notify() {
+        pthread_cond_signal(&pcond_);
+    }
 
-            void notifyAll()
-            {
-                pthread_cond_broadcast(&pcond_);
-            }
+    void notifyAll() {
+        pthread_cond_broadcast(&pcond_);
+    }
 
-        private:
-            MutexLock& mutex_;
-            pthread_cond_t pcond_;
-    };
+private:
+    MutexLock& mutex_;
+    pthread_cond_t pcond_;
+};
 }
-#endif 
+#endif
